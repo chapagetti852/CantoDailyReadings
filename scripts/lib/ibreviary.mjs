@@ -30,6 +30,7 @@ export const KIND_OF_HEADING = [
   ["over_people", /^(prayer over the people|super populum|oratio super populum|solemn blessing)/i],
 ];
 const PROPER = new Set(["entrance", "collect", "offertory", "preface", "communion", "postcommunion", "over_people"]);
+const REQUIRED = new Set(["entrance", "collect", "communion", "postcommunion"]);
 const KIND_RE = new RegExp(KIND_OF_HEADING.map(([, re]) => `(?:${re.source})`).join("|"), "i");
 const NOISE = /^(today|oggi|home|menu|back|indietro|options|opzioni|calendar|calendario|share|condividi|www\.|©|copyright|ibreviary|font|print|stampa|settings)/i;
 const CITE_LINE = /^(?:cf\.?\s*)?(?:[1-3]\s?)?[A-Z][a-z]{0,4}\.?\s*\d+\s*(?:\(\d+\))?\s*[:,]\s*\d/i;
@@ -104,34 +105,60 @@ export class IBreviary {
     return `${p}=${encodeURIComponent(f(y, m, d))}`;
   }
 
-  pageUrl(iso, lang) { return `${BASE}messale.php?lang=${lang}&${this.dateQuery(iso)}`; }
+  /** The Mass-of-the-day page lives behind the menu's "Reading" tab; find its path once. */
+  async readingsPath(iso, lang) {
+    if (this.readingsPathCache) return this.readingsPathCache;
+    const menuUrl = `${BASE}messale.php?lang=${lang}&${this.dateQuery(iso)}`;
+    const { html } = await this.fetcher.get(menuUrl);
+    let path = null;
+    if (html) {
+      const links = [...html.matchAll(/<a[^>]*href="([^"#]*)"[^>]*>([\s\S]*?)<\/a>/gi)]
+        .map((m) => ({ href: decodeEntities(m[1]), text: decodeEntities(m[2].replace(/<[^>]+>/g, "")).replace(/\s+/g, " ").trim() }))
+        .filter((l) => l.href && !/^(javascript|mailto)/i.test(l.href));
+      this.log.log(`iBreviary menu links (${menuUrl}):`);
+      for (const l of links) this.log.log(`  ${l.text}  ->  ${l.href}`);
+      const pick = links.find((l) => /^(reading|readings|letture|lecturas|lectures|leituras|lecturi)/i.test(l.text))
+        || links.find((l) => /lettur|reading|lectur/i.test(l.href));
+      if (pick) path = pick.href.replace(/^https?:\/\/[^/]+/, "").replace(/^\/m2\//, "").replace(/^\//, "").split("?")[0];
+    }
+    this.readingsPathCache = path || "letture.php";
+    this.log.log(`iBreviary readings page: ${this.readingsPathCache}`);
+    return this.readingsPathCache;
+  }
+
+  async pageUrl(iso, lang) { return `${BASE}${await this.readingsPath(iso, lang)}?lang=${lang}&${this.dateQuery(iso)}`; }
 
   dumpOnce(url, html, why) {
     if (this.dumped) return;
     this.dumped = true;
     const langs = [...new Set([...html.matchAll(/[?&]lang=([a-z]{2})\b/gi)].map((m) => m[1].toLowerCase()))];
     this.log.log(`iBreviary ${why}: ${url}; title="${titleOf(html)}"; language codes on page: ${langs.join(", ") || "none"}`);
-    for (const l of htmlToLines(html).slice(0, 70)) this.log.log("  | " + l);
+    for (const l of htmlToLines(html).slice(0, 90)) this.log.log("  | " + l);
   }
+
+  static usable(parsed) { return parsed.blocks.some((b) => REQUIRED.has(b.kind) && b.lines.length); }
 
   async page(iso, lang) {
     const key = `${iso}/${lang}`;
     if (this.mem.has(key)) return this.mem.get(key);
     const path = join(this.cacheDir, lang, `${iso}.json`);
-    let html = null;
-    const url = this.pageUrl(iso, lang);
-    if (existsSync(path)) ({ html } = JSON.parse(readFileSync(path, "utf8")));
+    let html = null, url = null;
+    if (existsSync(path)) {
+      ({ html, url } = JSON.parse(readFileSync(path, "utf8")));
+      if (!IBreviary.usable(parseMissalHtml(html))) html = null; // stale entry from an earlier parser
+    }
     if (html == null) {
+      url = await this.pageUrl(iso, lang);
       const r = await this.fetcher.get(url);
       if (!r.html) { this.failed.push(`${key}: not fetched`); this.mem.set(key, null); return null; }
       const parsed = parseMissalHtml(r.html);
-      if (!parsed.blocks.some((b) => PROPER.has(b.kind))) {
-        this.dumpOnce(url, r.html, "page fetched but no Missal proper headings recognised");
-        this.failed.push(`${key}: no proper headings recognised`);
+      if (!IBreviary.usable(parsed)) {
+        this.dumpOnce(url, r.html, "page fetched but no antiphon/collect recognised");
+        this.failed.push(`${key}: no antiphon/collect recognised`);
         this.mem.set(key, null);
         return null;
       }
-      this.dumpOnce(url, r.html, "first Missal page");
+      this.dumpOnce(url, r.html, "first Mass-of-the-day page");
       html = r.html;
       this.fetched++;
       mkdirSync(join(this.cacheDir, lang), { recursive: true });
@@ -161,6 +188,11 @@ export class IBreviary {
     en.sets.forEach((set, i) => { const s = score(set); if (s > bestScore) { best = i; bestScore = s; } });
     if (best == null) return { en: null, la: null, title: en.title[0] ?? null };
     const la = await this.page(iso, "la");
-    return { en: en.sets[best], la: la?.sets[best] ?? la?.sets[0] ?? null, title: en.title[0] ?? null };
+    let laSet = la?.sets[best] ?? la?.sets[0] ?? null;
+    if (laSet && en.sets[best] && JSON.stringify(laSet) === JSON.stringify(en.sets[best])) {
+      if (!this.laWarned) { this.laWarned = true; this.failed.push("lang=la returned the English page; Latin language code needs changing"); }
+      laSet = null;
+    }
+    return { en: en.sets[best], la: laSet, title: en.title[0] ?? null };
   }
 }

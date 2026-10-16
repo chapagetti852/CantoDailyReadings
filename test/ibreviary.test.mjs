@@ -34,7 +34,8 @@ test("match a HK set and fetch Latin for the same formulary", async () => {
   const urls = [];
   const fetcher = new PoliteFetcher({ delayMs: 0, fetchImpl: async (url) => {
     urls.push(url);
-    const body = /lang=la/.test(url) ? la : en;
+    const menu = `<a href="/m2/breviario.php">Breviary</a><a href="/m2/letture.php">Reading</a><a href="/m2/messale.php?s=ordinario">Ordinary</a>`;
+    const body = /messale\.php/.test(url) ? menu : (/lang=la/.test(url) ? la : en);
     return { ok: true, status: 200, text: async () => body, headers: new Map() };
   } });
   const ib = new IBreviary({ cacheDir: dir, fetcher, log: { log() {}, warn() {} } });
@@ -42,8 +43,9 @@ test("match a HK set and fetch Latin for the same formulary", async () => {
   assert.ok(m.en, "matched");
   assert.equal(m.en.find((b) => b.kind === "collect").lines[0], "May your grace, O Lord, we pray,");
   assert.equal(m.la.find((b) => b.kind === "collect").lines[0], "Tua nos, quaesumus, Domine, gratia semper et praeveniat et sequatur,");
-  assert.ok(urls[0].includes("messale.php?lang=en&date=20261016"), "Mass of the day page");
-  assert.ok(urls[1].includes("lang=la"), "Latin fetched after a match");
+  assert.ok(urls[0].includes("messale.php?lang=en&date=20261016"), "menu fetched first");
+  assert.ok(urls[1].includes("letture.php?lang=en&date=20261016"), "readings page discovered from the menu");
+  assert.ok(urls[2].includes("letture.php?lang=la"), "Latin fetched after a match");
   const none = await ib.match("2026-10-16", { entrance: parseCitation("詠70:2"), communion: null });
   assert.equal(none.en, null);
   rmSync(dir, { recursive: true, force: true });
