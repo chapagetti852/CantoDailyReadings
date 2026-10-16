@@ -15,7 +15,7 @@ const DATE_PARAMS = ["date", "data", "giorno"];
 const DATE_FORMATS = [(y, m, d) => `${y}${m}${d}`, (y, m, d) => `${y}-${m}-${d}`, (y, m, d) => `${d}/${m}/${y}`];
 
 export const KIND_OF_HEADING = [
-  ["entrance", /^(entrance antiphon|antiphona ad introitum|ad introitum|introit)/i],
+  ["entrance", /^(entrance antiphon|antiphona ad introitum|ad introitum|introit|antifona d'ingresso)/i],
   ["reading1", /^(first reading|reading i\b|reading 1\b|lectio prima|prima lectio|lectio i\b)/i],
   ["psalm", /^(responsorial psalm|psalmus responsorius|psalm)/i],
   ["reading2", /^(second reading|reading ii\b|reading 2\b|lectio secunda|altera lectio|lectio ii\b)/i],
@@ -25,8 +25,8 @@ export const KIND_OF_HEADING = [
   ["collect", /^(collect|collecta|oratio collecta|opening prayer)/i],
   ["offertory", /^(prayer over the (offerings|gifts)|super oblata|oratio super oblata)/i],
   ["preface", /^(preface|praefatio)/i],
-  ["communion", /^(communion antiphon|antiphona ad communionem|ad communionem)/i],
-  ["postcommunion", /^(prayer after communion|post communionem|oratio post communionem)/i],
+  ["communion", /^(communion antiphon|antiphona ad communionem|ad communionem|antifona alla comunione)/i],
+  ["postcommunion", /^(prayer after communion|post communionem|oratio post communionem|dopo la comunione)/i],
   ["over_people", /^(prayer over the people|super populum|oratio super populum|solemn blessing)/i],
 ];
 const PROPER = new Set(["entrance", "collect", "offertory", "preface", "communion", "postcommunion", "over_people"]);
@@ -38,8 +38,9 @@ const CITE_LINE = /^(?:cf\.?\s*)?(?:[1-3]\s?)?[A-Z][a-z]{0,4}\.?\s*\d+\s*(?:\(\d
 function ymd(iso) { const [y, m, d] = iso.split("-"); return [y, m, d]; }
 
 /** Group a flat list of heading/text lines into Missal blocks. */
-export function parseMissalHtml(html) {
-  const lines = htmlToLines(html).filter((l) => !NOISE.test(l));
+export function parseMissalHtml(html) { return parseMissalLines(htmlToLines(html).filter((l) => !NOISE.test(l))); }
+
+export function parseMissalLines(lines) {
   const blocks = [];
   const title = [];
   let cur = null;
@@ -62,7 +63,7 @@ function cleanCite(s) { return s.replace(/\s+/g, " ").replace(/^cf\.?\s*/i, "").
 export function groupSets(blocks) {
   const sets = [];
   let cur = null;
-  for (const b of blocks) {
+  for (const b of blocks.filter((x) => x.lines.length)) {
     if (!cur || cur.some((x) => x.kind === b.kind)) { cur = []; sets.push(cur); }
     cur.push(b);
   }
@@ -105,70 +106,95 @@ export class IBreviary {
     return `${p}=${encodeURIComponent(f(y, m, d))}`;
   }
 
-  /** The Mass-of-the-day page lives behind the menu's "Reading" tab; find its path once. */
-  async readingsPath(iso, lang) {
-    if (this.readingsPathCache) return this.readingsPathCache;
-    const menuUrl = `${BASE}messale.php?lang=${lang}&${this.dateQuery(iso)}`;
-    const { html } = await this.fetcher.get(menuUrl);
-    let path = null;
-    if (html) {
-      const links = [...html.matchAll(/<a[^>]*href="([^"#]*)"[^>]*>([\s\S]*?)<\/a>/gi)]
-        .map((m) => ({ href: decodeEntities(m[1]), text: decodeEntities(m[2].replace(/<[^>]+>/g, "")).replace(/\s+/g, " ").trim() }))
-        .filter((l) => l.href && !/^(javascript|mailto)/i.test(l.href));
-      this.log.log(`iBreviary menu links (${menuUrl}):`);
-      for (const l of links) this.log.log(`  ${l.text}  ->  ${l.href}`);
-      const pick = links.find((l) => /^(reading|readings|letture|lecturas|lectures|leituras|lecturi)/i.test(l.text))
-        || links.find((l) => /lettur|reading|lectur/i.test(l.href));
-      if (pick) path = pick.href.replace(/^https?:\/\/[^/]+/, "").replace(/^\/m2\//, "").replace(/^\//, "").split("?")[0];
-    }
-    this.readingsPathCache = path || "letture.php";
-    this.log.log(`iBreviary readings page: ${this.readingsPathCache}`);
-    return this.readingsPathCache;
+  /** Links on a page: [{href, text}] with the site prefix removed. */
+  static links(html) {
+    return [...html.matchAll(/<a[^>]*href="([^"#]*)"[^>]*>([\s\S]*?)<\/a>/gi)]
+      .map((m) => ({ href: decodeEntities(m[1]).replace(/^https?:\/\/[^/]+/, "").replace(/^\/m2\//, "").replace(/^\//, ""), text: decodeEntities(m[2].replace(/<[^>]+>/g, "")).replace(/\s+/g, " ").trim() }))
+      .filter((l) => l.href && !/^(javascript|mailto)/i.test(l.href));
   }
 
-  async pageUrl(iso, lang) { return `${BASE}${await this.readingsPath(iso, lang)}?lang=${lang}&${this.dateQuery(iso)}`; }
+  /**
+   * The Reading tab (letture.php) is a menu whose sub-pages hold the propers:
+   * "Entrance Antiphon and Collect", "Prayer over the Offerings",
+   * "Antiphon and Prayer after Communion". Discover their hrefs once per
+   * language and remember every menu text so it can be stripped from pages.
+   */
+  async sections(iso, lang) {
+    this.sectionsCache ??= {};
+    if (this.sectionsCache[lang]) return this.sectionsCache[lang];
+    const menuUrl = `${BASE}letture.php?lang=${lang}&${this.dateQuery(iso)}`;
+    const { html } = await this.fetcher.get(menuUrl);
+    if (!html) return null;
+    const links = IBreviary.links(html);
+    this.log.log(`iBreviary Reading menu links (${menuUrl}):`);
+    for (const l of links) this.log.log(`  ${l.text}  ->  ${l.href}`);
+    const find = (re) => links.find((l) => re.test(l.text));
+    const picks = [
+      find(/entrance|introitum|ingresso|entrada|entrée|colle(c|t)/i),
+      find(/offerings|oblata|offerte|ofrendas|offrandes|gifts/i),
+      find(/after communion|post communionem|dopo la comunione|comuni[oó]n|communion/i),
+    ].filter(Boolean);
+    const menuTexts = new Set([...links.map((l) => l.text), ...htmlToLines(html)]);
+    const out = { picks, menuTexts };
+    this.sectionsCache[lang] = out;
+    this.log.log(`iBreviary proper pages: ${picks.map((p) => p.href).join(" | ") || "none found"}`);
+    return out;
+  }
 
-  dumpOnce(url, html, why) {
+  /** Remove the site menu lines that head every page. */
+  static stripMenu(lines, menuTexts) {
+    let i = 0;
+    while (i < lines.length && menuTexts.has(lines[i])) i++;
+    return lines.slice(i).filter((l) => !menuTexts.has(l) || l.length > 40);
+  }
+
+  dumpOnce(url, lines, why) {
     if (this.dumped) return;
     this.dumped = true;
-    const langs = [...new Set([...html.matchAll(/[?&]lang=([a-z]{2})\b/gi)].map((m) => m[1].toLowerCase()))];
-    this.log.log(`iBreviary ${why}: ${url}; title="${titleOf(html)}"; language codes on page: ${langs.join(", ") || "none"}`);
-    for (const l of htmlToLines(html).slice(0, 90)) this.log.log("  | " + l);
+    this.log.log(`iBreviary ${why}: ${url}`);
+    for (const l of lines.slice(0, 60)) this.log.log("  | " + l);
   }
-
-  static usable(parsed) { return parsed.blocks.some((b) => REQUIRED.has(b.kind) && b.lines.length); }
 
   async page(iso, lang) {
     const key = `${iso}/${lang}`;
     if (this.mem.has(key)) return this.mem.get(key);
     const path = join(this.cacheDir, lang, `${iso}.json`);
-    let html = null, url = null;
+    let pages = null;
     if (existsSync(path)) {
-      ({ html, url } = JSON.parse(readFileSync(path, "utf8")));
-      if (!IBreviary.usable(parseMissalHtml(html))) html = null; // stale entry from an earlier parser
+      const obj = JSON.parse(readFileSync(path, "utf8"));
+      pages = obj.pages ?? null; // older entries held one html page; refetch
     }
-    if (html == null) {
-      url = await this.pageUrl(iso, lang);
-      const r = await this.fetcher.get(url);
-      if (!r.html) { this.failed.push(`${key}: not fetched`); this.mem.set(key, null); return null; }
-      const parsed = parseMissalHtml(r.html);
+    if (pages == null) {
+      const sec = await this.sections(iso, lang);
+      if (!sec || !sec.picks.length) { this.failed.push(`${key}: proper pages not found in Reading menu`); this.mem.set(key, null); return null; }
+      pages = [];
+      for (const pick of sec.picks) {
+        const sep = pick.href.includes("?") ? "&" : "?";
+        const url = `${BASE}${pick.href}${sep}lang=${lang}&${this.dateQuery(iso)}`;
+        const r = await this.fetcher.get(url);
+        if (!r.html) { this.failed.push(`${key}: ${pick.text} not fetched`); continue; }
+        const lines = IBreviary.stripMenu(htmlToLines(r.html).filter((l) => !NOISE.test(l)), sec.menuTexts);
+        this.dumpOnce(url, lines, "first proper page");
+        pages.push({ url, text: pick.text, lines });
+      }
+      if (!pages.length) { this.mem.set(key, null); return null; }
+      const parsed = parseMissalLines(pages.flatMap((p) => p.lines));
       if (!IBreviary.usable(parsed)) {
-        this.dumpOnce(url, r.html, "page fetched but no antiphon/collect recognised");
-        this.failed.push(`${key}: no antiphon/collect recognised`);
+        this.failed.push(`${key}: no antiphon/collect recognised in ${pages.map((p) => p.url).join(", ")}`);
         this.mem.set(key, null);
         return null;
       }
-      this.dumpOnce(url, r.html, "first Mass-of-the-day page");
-      html = r.html;
-      this.fetched++;
+      this.fetched += pages.length;
       mkdirSync(join(this.cacheDir, lang), { recursive: true });
-      writeFileSync(path, JSON.stringify({ date: iso, lang, url, fetched: new Date().toISOString(), html }));
+      writeFileSync(path, JSON.stringify({ date: iso, lang, fetched: new Date().toISOString(), pages }));
     }
-    const parsed = parseMissalHtml(html);
-    const out = { url, title: parsed.title, sets: groupSets(parsed.blocks.filter((b) => PROPER.has(b.kind))) };
+    const parsed = parseMissalLines(pages.flatMap((p) => p.lines));
+    const out = { url: pages[0]?.url, title: parsed.title, sets: groupSets(parsed.blocks.filter((b) => PROPER.has(b.kind) && b.lines.length)) };
     this.mem.set(key, out);
     return out;
   }
+
+  static usable(parsed) { return parsed.blocks.some((b) => REQUIRED.has(b.kind) && b.lines.length); }
 
   /**
    * Find the iBreviary formulary matching a HK set by its antiphon citations.
