@@ -37,6 +37,8 @@ function addDays(iso, n) {
   return d.toISOString().slice(0, 10);
 }
 
+// Dates are built today-first, then forward, then back, so that when the
+// English source rate-limits us the day you are about to read gets its text.
 const dates = opt("--dates")
   ? opt("--dates").split(",").map((s) => s.trim()).filter(Boolean)
   : (() => {
@@ -44,7 +46,8 @@ const dates = opt("--dates")
       const ahead = Number(process.env.WINDOW_AHEAD ?? 14);
       const today = hkToday();
       const out = [];
-      for (let i = -back; i <= ahead; i++) out.push(addDays(today, i));
+      for (let i = 0; i <= ahead; i++) out.push(addDays(today, i));
+      for (let i = 1; i <= back; i++) out.push(addDays(today, -i));
       return out;
     })();
 
@@ -56,6 +59,22 @@ const nabre = english ? new Nabre({ fetcher }) : null;
 const lect = english ? new Lectionary({ fetcher }) : null;
 
 const fixture = opt("--fixture");
+
+// Raw Hong Kong pages are cached for a few days so frequent runs do not refetch them.
+const DLC_CACHE = "cache/dlc";
+const DLC_MAX_AGE_MS = 5 * 24 * 3600e3;
+function readDlcCache(date) {
+  const p = join(DLC_CACHE, `${date}.html`);
+  if (!existsSync(p)) return null;
+  const meta = JSON.parse(readFileSync(p + ".json", "utf8"));
+  if (Date.now() - Date.parse(meta.fetched) > DLC_MAX_AGE_MS) return null;
+  return { bytes: new Uint8Array(readFileSync(p)), url: meta.url };
+}
+function writeDlcCache(date, url, bytes) {
+  mkdirSync(DLC_CACHE, { recursive: true });
+  writeFileSync(join(DLC_CACHE, `${date}.html`), bytes);
+  writeFileSync(join(DLC_CACHE, `${date}.html.json`), JSON.stringify({ url, fetched: new Date().toISOString() }));
+}
 const built = [];
 const problems = [];
 
@@ -64,10 +83,15 @@ for (const date of dates) {
   try {
     if (fixture) { bytes = new Uint8Array(readFileSync(fixture)); url = fixture; }
     else {
-      const r = await fetchDlc(date);
-      url = r.url;
-      if (r.status === 404) { console.log(`${date}: not published yet (404)`); continue; }
-      bytes = r.bytes;
+      const cached = readDlcCache(date);
+      if (cached) { bytes = cached.bytes; url = cached.url; }
+      else {
+        const r = await fetchDlc(date);
+        url = r.url;
+        if (r.status === 404) { console.log(`${date}: not published yet (404)`); continue; }
+        bytes = r.bytes;
+        writeDlcCache(date, url, bytes);
+      }
     }
   } catch (e) {
     problems.push(`${date}: fetch failed: ${e.message}`);

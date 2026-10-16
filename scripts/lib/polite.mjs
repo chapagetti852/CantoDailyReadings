@@ -20,6 +20,33 @@ export class PoliteFetcher {
     this.retryWaitsMs = retryWaitsMs; this.log = log;
     this.sleep = sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
     this.lastAt = 0; this.count = 0; this.blocked = false; this.failed = [];
+    this.cookies = new Map(); // name -> value, sent back like a browser would
+    this.lastUrl = null; this.diagnosed = false;
+  }
+
+  headersFor(url) {
+    const h = { ...HEADERS };
+    if (this.cookies.size) h.cookie = [...this.cookies].map(([k, v]) => `${k}=${v}`).join("; ");
+    if (this.lastUrl) { h.referer = this.lastUrl; h["sec-fetch-site"] = "same-origin"; }
+    return h;
+  }
+
+  rememberCookies(res) {
+    const list = res.headers?.getSetCookie?.() ?? (res.headers?.get?.("set-cookie") ? [res.headers.get("set-cookie")] : []);
+    for (const c of list) {
+      const m = /^([^=;]+)=([^;]*)/.exec(c);
+      if (m) this.cookies.set(m[1].trim(), m[2].trim());
+    }
+  }
+
+  async diagnose(url, res) {
+    if (this.diagnosed) return;
+    this.diagnosed = true;
+    const keep = ["server", "via", "x-cache", "x-varnish", "retry-after", "content-type", "set-cookie", "x-robots-tag", "cf-ray", "x-served-by"];
+    const hdr = keep.map((k) => [k, res.headers?.get?.(k)]).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join(" | ");
+    let body = "";
+    try { body = (await res.text()).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300); } catch {}
+    this.log.warn(`! diagnostics for HTTP ${res.status} at ${url}\n  headers: ${hdr}\n  body: ${body}`);
   }
 
   /** @returns {Promise<{status:number, html:string|null}>} status 0 = not attempted */
@@ -39,9 +66,11 @@ export class PoliteFetcher {
       this.count++;
       let res;
       try {
-        res = await this.fetchImpl(url, { signal: AbortSignal.timeout(30000), headers: HEADERS, redirect: "follow" });
+        res = await this.fetchImpl(url, { signal: AbortSignal.timeout(30000), headers: this.headersFor(url), redirect: "follow" });
       } catch (e) { last = { status: -1, err: e.message }; continue; }
-      if (res.ok) return { status: res.status, html: await res.text() };
+      this.rememberCookies(res);
+      if (res.ok) { this.lastUrl = url; return { status: res.status, html: await res.text() }; }
+      if (res.status === 403 || res.status === 429) await this.diagnose(url, res);
       last = { status: res.status, server: res.headers?.get?.("server"), mitigated: res.headers?.get?.("cf-mitigated") };
       if (res.status === 404) return { status: 404, html: null };
       if (![403, 429, 500, 502, 503, 504].includes(res.status)) break;

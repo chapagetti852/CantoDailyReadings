@@ -67,3 +67,16 @@ test("polite fetcher stops after a persistent 403", async () => {
   assert.equal(r2.status, 0);
   assert.equal(calls, 2, "no further requests once blocked");
 });
+
+test("polite fetcher returns cookies and a referer like a browser", async () => {
+  const seen = [];
+  const f = new PoliteFetcher({ delayMs: 0, fetchImpl: async (url, init) => {
+    seen.push(init.headers);
+    return { ok: true, status: 200, text: async () => "<p>ok</p>", headers: { getSetCookie: () => ["visited=1; Path=/", "ab=xyz; HttpOnly"], get: () => null } };
+  } });
+  await f.get("https://bible.usccb.org/bible/readings/101626.cfm");
+  await f.get("https://bible.usccb.org/bible/luke/12");
+  assert.equal(seen[0].cookie, undefined);
+  assert.equal(seen[1].cookie, "visited=1; ab=xyz");
+  assert.equal(seen[1].referer, "https://bible.usccb.org/bible/readings/101626.cfm");
+});
