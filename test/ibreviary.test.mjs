@@ -58,7 +58,7 @@ test("a bare Antiphon heading takes the kind of its page", () => {
   const pages = [
     { antiphonKind: "entrance", lines: ["Antiphon", "Cf. Mt 4: 18-19", "Beside the Sea of Galilee,", "The Gloria in excelsis (Glory to God in the highest) is said.", "Collect", "We humbly implore your majesty, O Lord,"] },
     { antiphonKind: null, lines: ["Prayer over the Offerings", "Accept, O Lord, the prayers of your faithful"] },
-    { antiphonKind: "communion", lines: ["Antiphon", "Cf. Ps 34 (33):11", "The rich suffer want and go hungry,", "Prayer after Communion", "We entreat your majesty most humbly, O Lord,"] },
+    { antiphonKind: "communion", lines: ["Antiphona ad introitum", "Cf. Ps 34 (33):11", "The rich suffer want and go hungry,", "Prayer after Communion", "We entreat your majesty most humbly, O Lord,"] },
   ];
   const { blocks } = parsePages(pages);
   assert.deepEqual(blocks.map((b) => [b.kind, b.citation]), [["entrance", "Mt 4: 18-19"], ["collect", null], ["offertory", null], ["communion", "Ps 34 (33):11"], ["postcommunion", null]]);

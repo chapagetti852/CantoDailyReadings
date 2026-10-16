@@ -60,6 +60,7 @@ p.zh.intro { color: var(--ink-soft); font-size: .98rem; }
 .en { font-family: var(--serif-en); font-size: 1rem; line-height: 1.55; color: var(--ink-soft); margin: .5rem 0 .9rem; padding-left: .9rem; border-left: 2px solid var(--rule); }
 .en sup { font-size: .6em; color: var(--accent); margin-right: .15em; font-family: var(--sans); }
 .en b { color: var(--ink); font-weight: 600; }
+.en .alt, .la .alt { color: var(--muted); font-size: .85em; }
 body.noen .en { display: none; }
 .la { font-family: var(--serif-en); font-style: italic; font-size: .98rem; line-height: 1.55; color: var(--ink-soft); margin: .4rem 0 .9rem; padding-left: .9rem; border-left: 2px solid var(--rule); }
 body.nola .la { display: none; }

@@ -56,7 +56,7 @@
       body = s.en.verses.map((v) => `<sup>${esc(v.ref.split(":")[1])}</sup>${esc(v.text)}`).join(" ");
     } else {
       const keepLines = s.kind === "psalm" || s.kind === "alleluia" || s.kind === "sequence";
-      const ls = s.en.lines.map((l) => (/^R\.|^R:/.test(l) ? `<b><span class="r">R.</span> ${esc(l.replace(/^R\.?\s*(\([^)]*\))?\s*/, ""))}</b>` : esc(l)));
+      const ls = s.en.lines.map((l) => (/^R\.|^R:/.test(l) ? `<b><span class="r">R.</span> ${esc(l.replace(/^R\.?\s*(\([^)]*\))?\s*/, ""))}</b>` : /^(Or|Vel)\b/.test(l) ? `<i class="alt">${esc(l)}</i>` : esc(l)));
       body = keepLines ? ls.join("<br>") : ls.join(" ");
     }
     return `<p class="en" lang="en" translate="yes">${body}</p>`;
@@ -64,7 +64,7 @@
 
   function laHtml(s) {
     if (!s.la) return "";
-    const ls = s.la.lines.map((l) => esc(l));
+    const ls = s.la.lines.map((l) => (/^(Vel|Or)\b/.test(l) ? `<i class="alt">${esc(l)}</i>` : esc(l)));
     const keep = s.kind === "entrance" || s.kind === "communion";
     return `<p class="la" lang="la" translate="yes">${keep ? ls.join("<br>") : ls.join(" ")}</p>`;
   }

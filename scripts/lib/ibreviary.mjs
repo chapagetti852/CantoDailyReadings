@@ -70,6 +70,9 @@ export function parseMissalLines(lines, antiphonKind = "entrance") {
     if (RUBRIC_LINE.test(line)) continue;
     let km = KIND_OF_HEADING.find(([, re]) => re.test(line) && line.length < 60);
     if (!km && /^(antiphon|antiphona|antifona)$/i.test(line) && antiphonKind) km = [antiphonKind];
+    // A sub-page carries only its own antiphon, whatever the label says (the Latin
+    // communion page labels it like an entrance antiphon).
+    if (km && antiphonKind && (km[0] === "entrance" || km[0] === "communion")) km = [antiphonKind];
     if (km) { cur = { kind: km[0], heading: line, citation: null, lines: [] }; blocks.push(cur); continue; }
     if (!cur) { if (line.length <= 90) title.push(line); continue; }
     // Citation: on its own line ("Ps 130 (129):3-4", "Cf. Mt 25:34") or trailing in parentheses.
