@@ -62,10 +62,12 @@ test("polite fetcher stops after a persistent 403", async () => {
   const r = await f.get("https://bible.usccb.org/bible/mark/6");
   assert.equal(r.status, 403);
   assert.equal(calls, 2, "one retry");
-  assert.ok(f.blocked);
+  assert.ok(f.blocked.has("chapter"));
   const r2 = await f.get("https://bible.usccb.org/bible/mark/7");
   assert.equal(r2.status, 0);
-  assert.equal(calls, 2, "no further requests once blocked");
+  assert.equal(calls, 2, "no further chapter requests once blocked");
+  await f.get("https://bible.usccb.org/bible/readings/101626.cfm");
+  assert.equal(calls, 4, "readings pages are a separate class and still tried");
 });
 
 test("polite fetcher returns cookies and a referer like a browser", async () => {
@@ -79,4 +81,16 @@ test("polite fetcher returns cookies and a referer like a browser", async () => 
   assert.equal(seen[0].cookie, undefined);
   assert.equal(seen[1].cookie, "visited=1; ab=xyz");
   assert.equal(seen[1].referer, "https://bible.usccb.org/bible/readings/101626.cfm");
+});
+
+test("a JavaScript challenge page is not retried and blocks only its class", async () => {
+  let calls = 0;
+  const f = new PoliteFetcher({ delayMs: 0, retryWaitsMs: [0, 0], sleep: async () => {}, log: { warn() {} },
+    fetchImpl: async () => { calls++; return { ok: false, status: 403, headers: new Map(), text: async () => "<html><body>Checking connection <script>…</script></body></html>" }; } });
+  const r = await f.get("https://bible.usccb.org/bible/isaiah/2");
+  assert.equal(r.status, 403);
+  assert.equal(calls, 1, "no retry on a challenge page");
+  assert.ok(f.blocked.has("chapter"));
+  assert.ok(!f.blocked.has("readings"));
+  assert.match(f.failed[0], /challenge/);
 });

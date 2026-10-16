@@ -19,7 +19,7 @@ export class PoliteFetcher {
     this.fetchImpl = fetchImpl; this.delayMs = delayMs; this.maxFetches = maxFetches;
     this.retryWaitsMs = retryWaitsMs; this.log = log;
     this.sleep = sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
-    this.lastAt = 0; this.count = 0; this.blocked = false; this.failed = [];
+    this.lastAt = 0; this.count = 0; this.blocked = new Set(); this.failed = [];
     this.cookies = new Map(); // name -> value, sent back like a browser would
     this.lastUrl = null; this.diagnosed = false;
   }
@@ -39,19 +39,30 @@ export class PoliteFetcher {
     }
   }
 
+  async isChallenge(res) {
+    try {
+      if (res.bodyText === undefined) res.bodyText = await res.text();
+      return /checking (your )?connection|enable javascript|challenge/i.test(res.bodyText);
+    } catch { return false; }
+  }
+
   async diagnose(url, res) {
     if (this.diagnosed) return;
     this.diagnosed = true;
     const keep = ["server", "via", "x-cache", "x-varnish", "retry-after", "content-type", "set-cookie", "x-robots-tag", "cf-ray", "x-served-by"];
     const hdr = keep.map((k) => [k, res.headers?.get?.(k)]).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join(" | ");
     let body = "";
-    try { body = (await res.text()).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300); } catch {}
+    try { if (res.bodyText === undefined) res.bodyText = await res.text(); body = res.bodyText.replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 200); } catch {}
     this.log.warn(`! diagnostics for HTTP ${res.status} at ${url}\n  headers: ${hdr}\n  body: ${body}`);
   }
 
+  /** Pages are blocked per class: a challenge on chapter pages must not stop the readings pages. */
+  static classOf(url) { return url.includes("/bible/readings/") ? "readings" : "chapter"; }
+
   /** @returns {Promise<{status:number, html:string|null}>} status 0 = not attempted */
   async get(url) {
-    if (this.blocked) return { status: 0, html: null };
+    const cls = PoliteFetcher.classOf(url);
+    if (this.blocked.has(cls)) return { status: 0, html: null };
     if (this.count >= this.maxFetches) {
       if (!this.capNoted) { this.failed.push(`per-run fetch cap (${this.maxFetches}) reached; remaining pages next run`); this.capNoted = true; }
       return { status: 0, html: null };
@@ -74,12 +85,17 @@ export class PoliteFetcher {
       last = { status: res.status, server: res.headers?.get?.("server"), mitigated: res.headers?.get?.("cf-mitigated") };
       if (res.status === 404) return { status: 404, html: null };
       if (![403, 429, 500, 502, 503, 504].includes(res.status)) break;
+      if (res.status === 403 && await this.isChallenge(res)) {
+        // A JavaScript "Checking connection" interstitial: deterministic for uncached pages, so retrying is pointless.
+        last.challenge = true;
+        break;
+      }
       this.log.warn(`! ${url}: HTTP ${res.status}${last.server ? ` (server: ${last.server})` : ""}${last.mitigated ? ` cf-mitigated=${last.mitigated}` : ""}; retry ${attempt + 1}/${this.retryWaitsMs.length}`);
     }
-    this.failed.push(`${url}: ${last?.err ? last.err : "HTTP " + last?.status}`);
+    this.failed.push(`${url}: ${last?.err ? last.err : "HTTP " + last?.status}${last?.challenge ? " (JavaScript challenge page)" : ""}`);
     if (last && (last.status === 403 || last.status === 429)) {
-      this.blocked = true;
-      this.failed.push("site is refusing requests from this runner; stopped fetching for this run (cached pages still used)");
+      this.blocked.add(cls);
+      this.failed.push(`${cls} pages are being refused for this runner; no more ${cls} fetches this run (cached pages still used)`);
     }
     return { status: last?.status ?? -1, html: null };
   }

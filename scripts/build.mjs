@@ -60,6 +60,11 @@ const lect = english ? new Lectionary({ fetcher }) : null;
 
 const fixture = opt("--fixture");
 
+// Fetch the USCCB daily readings pages for every date before any chapter lookup:
+// they carry the official wording and are served from the site's cache, whereas
+// chapter pages often hit a bot challenge that then blocks further chapter fetches.
+if (english && !fixture) for (const d of dates) await lect.day(d);
+
 // Raw Hong Kong pages are cached for a few days so frequent runs do not refetch them.
 const DLC_CACHE = "cache/dlc";
 const DLC_MAX_AGE_MS = 5 * 24 * 3600e3;
