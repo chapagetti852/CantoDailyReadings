@@ -39,7 +39,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .tools { max-width: 38rem; margin: 0 auto; font-family: var(--ui); font-size: 14px; }
 .tools .row { display: flex; align-items: flex-start; gap: 6px; padding: 10px 0 4px; }
 .tools .sp { flex: 1; }
-.tools .row button { font: inherit; background: none; border: 0; padding: 0; cursor: pointer; color: var(--ink); width: 58px;
+.tools .row > button:not(.chip) { font: inherit; background: none; border: 0; padding: 0; cursor: pointer; color: var(--ink); width: 58px;
                      display: flex; flex-direction: column; align-items: center; gap: 3px; }
 .coin { width: 40px; height: 40px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
         border: 1px solid var(--rule); background: var(--paper); transition: opacity .15s, border-color .15s, background .15s; }
@@ -51,6 +51,13 @@ button[aria-pressed="false"] .coin { opacity: .4; }
 button[aria-pressed="false"] .cap { opacity: .55; }
 button[aria-pressed="true"] .coin { border-color: var(--rubric); background: var(--rubric-soft); }
 #tSize[aria-pressed="true"] .coin { border-color: var(--ink-3); background: var(--rule-2); }
+.tools .opts { gap: 8px; padding: 4px 0 10px; align-items: center; }
+.tools .opts[hidden] { display: none; }
+.optlab { font-family: var(--zh); font-size: 13px; color: var(--ink-3); letter-spacing: .1em; margin-right: 4px; }
+.chip { font-family: var(--ui); font-size: 13px; letter-spacing: .04em; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--rule); color: var(--ink-3); background: var(--paper); }
+.chip.la { font-family: var(--en); font-style: italic; font-size: 14px; }
+.chip[aria-pressed="true"] { color: var(--rubric); border-color: var(--rubric); background: var(--rubric-soft); }
+button.menu[aria-expanded="true"] .cap { color: var(--rubric); }
 .tools .sizes { gap: 18px; padding: 6px 0 10px; align-items: center; }
 .tools .sizes label { flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; }
 .tools .sizes .lab { font-family: var(--zh); font-size: 13px; color: var(--ink-3); white-space: nowrap; }
@@ -65,8 +72,7 @@ main { max-width: 38rem; margin: 0 auto; padding: 1.4rem 0 3.5rem; }
 /* Day title block */
 h1 { font-size: 1.45rem; font-weight: 700; line-height: 1.4; margin: 0; letter-spacing: .01em; text-wrap: balance; }
 .title-sub { font-size: 1rem; line-height: 1.6; margin: .15rem 0 0; color: var(--rubric); }
-.title-en { font-family: var(--en); font-variant: small-caps; letter-spacing: .06em; color: var(--ink-3); font-size: 1rem; line-height: 1.5; margin: .2rem 0 0; padding: 0; border: 0; font-style: normal; }
-.title-en.la { font-style: italic; font-variant: normal; }
+.title-la { font-family: var(--en); font-style: italic; color: var(--ink-3); font-size: 1.02rem; line-height: 1.5; margin: .25rem 0 0; }
 h1.divider { margin-top: 3rem; padding-top: 1.2rem; border-top: 1px solid var(--rubric); font-size: 1.2rem; }
 
 /* Section heading: red rubric left, citation right, hairline below */
@@ -91,15 +97,19 @@ body.noruby p.zh { line-height: 1.95; }
 .who.resp-mark::after { content: ""; }
 
 /* English and Latin: book face, a small red language mark hanging in the margin */
-.en, .la { font-family: var(--en); font-size: 1.05rem; line-height: 1.5; color: var(--ink); margin: .55rem 0 .95rem; padding-left: 1rem; border-left: 1px solid var(--rule); }
+.en, .la { font-family: var(--en); font-size: 1.05rem; line-height: 1.5; color: var(--ink); margin: 1.1rem 0 1rem; padding-left: 1rem; border-left: 1px solid var(--rule); }
+.en + .la { margin-top: .6rem; }
 .la { font-style: italic; }
 .en sup { font-size: .6em; color: var(--rubric); margin-right: .15em; font-family: var(--ui); font-style: normal; }
 .en b { font-weight: 600; }
 .en .r { font-family: var(--ui); font-size: .7em; letter-spacing: .08em; color: var(--rubric); vertical-align: .1em; font-weight: 600; }
 .en .alt, .la .alt { color: var(--ink-3); font-size: .85em; font-style: italic; }
-body.noen .en { display: none; }
-body.nola .la { display: none; }
+body.noread section.reading { display: none; }
+body.noread-en section.reading .en { display: none; }
 body.noprop section.proper { display: none; }
+body.noprop-en section.proper .en { display: none; }
+body.noprop-la section.proper .la { display: none; }
+section.reading .la { display: none; }
 
 details.note { margin-top: 2.5rem; border-top: 1px solid var(--rule); padding-top: .8rem; }
 details.note summary { cursor: pointer; font-size: .85rem; letter-spacing: .14em; color: var(--rubric); font-weight: 700; }

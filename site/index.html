@@ -29,11 +29,21 @@
 <nav class="tools">
   <div class="row">
     <button id="tRuby" aria-pressed="true"><span class="coin"><span class="glyph">粵</span></span><span class="cap">Yale</span></button>
-    <button id="tEn" aria-pressed="true"><span class="coin"><span class="glyph">英</span></span><span class="cap">English</span></button>
-    <button id="tLa" aria-pressed="false"><span class="coin"><span class="glyph">拉</span></span><span class="cap">Latine</span></button>
-    <button id="tProp" aria-pressed="false"><span class="coin"><span class="glyph">禱</span></span><span class="cap">Propers</span></button>
+    <button id="tRead" class="menu" aria-pressed="true" aria-expanded="false" aria-controls="readOpts"><span class="coin"><span class="glyph">讀</span></span><span class="cap">Readings</span></button>
+    <button id="tProp" class="menu" aria-pressed="false" aria-expanded="false" aria-controls="propOpts"><span class="coin"><span class="glyph">禱</span></span><span class="cap">Propers</span></button>
     <span class="sp"></span>
-    <button id="tSize" aria-pressed="false" aria-controls="sizes" aria-label="文字大小"><span class="coin"><span class="glyph aa">Aa</span></span><span class="cap">Size</span></button>
+    <button id="tSize" class="menu" aria-pressed="false" aria-expanded="false" aria-controls="sizes"><span class="coin"><span class="glyph aa">Aa</span></span><span class="cap">Size</span></button>
+  </div>
+  <div class="row opts" id="readOpts" hidden>
+    <span class="optlab">讀經</span>
+    <button class="chip" id="readZh" aria-pressed="true">中文</button>
+    <button class="chip" id="readEn" aria-pressed="true">English</button>
+  </div>
+  <div class="row opts" id="propOpts" hidden>
+    <span class="optlab">禱文</span>
+    <button class="chip" id="propZh" aria-pressed="false">中文</button>
+    <button class="chip" id="propEn" aria-pressed="false">English</button>
+    <button class="chip la" id="propLa" aria-pressed="false">Latine</button>
   </div>
   <div class="row sizes" id="sizes" hidden>
     <label><span class="lab">粵拼</span><input id="rtSize" type="range" min="8" max="20" step="1"></label>

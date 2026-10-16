@@ -267,6 +267,39 @@ export class IBreviary {
   static usable(parsed) { return parsed.blocks.some((b) => REQUIRED.has(b.kind) && b.lines.length); }
 
   /**
+   * The day's title in Latin, read from the Latin Breviary menu page (e.g.
+   * "S. Ignatii Antiocheni, episcopi et martyris"), cached per day. Null when
+   * the page has no recognisable title; the caller then falls back to the
+   * ferial title. The first page is dumped to the log for tuning.
+   */
+  async latinTitle(iso) {
+    const path = join(this.cacheDir, "title-la", `${iso}.json`);
+    let html = null;
+    if (existsSync(path)) ({ html } = JSON.parse(readFileSync(path, "utf8")));
+    if (html == null) {
+      const url = `${BASE}breviario.php?lang=la&${this.dateQuery(iso)}`;
+      const r = await this.fetcher.get(url);
+      if (!r.html) return null;
+      html = r.html;
+      mkdirSync(join(this.cacheDir, "title-la"), { recursive: true });
+      writeFileSync(path, JSON.stringify({ date: iso, url, fetched: new Date().toISOString(), html }));
+      if (!this.titleDumped) { this.titleDumped = true; this.log.log(`iBreviary Latin breviary page (${url}):`); for (const l of htmlToLines(html).slice(0, 40)) this.log.log("  | " + l); }
+    }
+    return IBreviary.pickLatinTitle(htmlToLines(html));
+  }
+
+  static pickLatinTitle(lines) {
+    const menu = /^(Breviarium|Lectionis|Orationis|Missale|Cetera|Invitatorium|Ad Officium|Ad Laudes|Ad Horam|Ad Tertiam|Ad Sextam|Ad Nonam|Ad Vesperas|Ad Completorium|Officium|Laudes|Vesperae|Completorium|Hora|Tertia|Sexta|Nona|-\s*Menu)/i;
+    const title = /(hebdomad|Dominica|Feria|Sabbato|Memoria|Festum|Sollemnitas|\bS\.|\bSs\.|Sancti|Sanctae|Beat|Nativit|Epiphan|Pasch|Pentecost|Advent|Quadrages|per annum)/i;
+    for (const raw of lines) {
+      const l = raw.replace(/\s+/g, " ").trim();
+      if (!l || l.length > 140 || menu.test(l) || NOISE.test(l)) continue;
+      if (title.test(l)) return l.replace(/\s*[-–—]\s*(Memoria ad libitum|Memoria|Festum|Sollemnitas)\s*$/i, (m) => m);
+    }
+    return null;
+  }
+
+  /**
    * Find the iBreviary formulary matching a HK set by its antiphon citations.
    * @returns {Promise<{en: object[]|null, la: object[]|null, title: string|null}>}
    */

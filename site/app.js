@@ -5,8 +5,13 @@
   const HK_OFFSET = 8 * 3600e3;
   const WEEKDAY = ["日", "一", "二", "三", "四", "五", "六"];
 
-  let settings = { ruby: true, en: true, la: false, propers: false, rtSize: 11, zhSize: 20 };
-  try { Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}")); } catch {}
+  // Chinese is the base layer of each group; a translation can only show on top of it.
+  let settings = { ruby: true, read: true, readEn: true, prop: false, propEn: true, propLa: false, rtSize: 11, zhSize: 20 };
+  try {
+    const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
+    if ("propers" in saved) { saved.prop = saved.propers; saved.propLa = !!saved.la; delete saved.propers; delete saved.la; delete saved.en; }
+    for (const k of Object.keys(settings)) if (k in saved) settings[k] = saved[k];
+  } catch {}
   const saveSettings = () => { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {} };
 
   const hkToday = () => new Date(Date.now() + HK_OFFSET).toISOString().slice(0, 10);
@@ -15,17 +20,24 @@
   const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
   function applySettings() {
-    document.body.classList.toggle("noruby", !settings.ruby);
-    document.body.classList.toggle("noen", !settings.en);
-    document.body.classList.toggle("nola", !settings.la);
-    document.body.classList.toggle("noprop", !settings.propers);
+    const b = document.body.classList;
+    b.toggle("noruby", !settings.ruby);
+    b.toggle("noread", !settings.read);
+    b.toggle("noread-en", !settings.readEn);
+    b.toggle("noprop", !settings.prop);
+    b.toggle("noprop-en", !settings.propEn);
+    b.toggle("noprop-la", !settings.propLa);
     document.documentElement.style.setProperty("--rt-size", settings.rtSize + "px");
     document.documentElement.style.setProperty("--zh-size", settings.zhSize + "px");
     $("rtSize").value = settings.rtSize; $("zhSize").value = settings.zhSize;
     $("tRuby").setAttribute("aria-pressed", String(settings.ruby));
-    $("tEn").setAttribute("aria-pressed", String(settings.en));
-    $("tLa").setAttribute("aria-pressed", String(settings.la));
-    $("tProp").setAttribute("aria-pressed", String(settings.propers));
+    $("tRead").setAttribute("aria-pressed", String(settings.read));
+    $("tProp").setAttribute("aria-pressed", String(settings.prop));
+    $("readZh").setAttribute("aria-pressed", String(settings.read));
+    $("readEn").setAttribute("aria-pressed", String(settings.read && settings.readEn));
+    $("propZh").setAttribute("aria-pressed", String(settings.prop));
+    $("propEn").setAttribute("aria-pressed", String(settings.prop && settings.propEn));
+    $("propLa").setAttribute("aria-pressed", String(settings.prop && settings.propLa));
   }
 
   function rubyHtml(line) {
@@ -76,8 +88,7 @@
     const [first, ...rest] = day.title;
     if (first) html += `<h1>${esc(first.zh)}</h1>`;
     for (const t of rest) html += `<p class="title-sub">${esc(t.zh)}</p>`;
-    if (day.titleEn) html += `<p class="title-en en" lang="en" translate="yes">${esc(day.titleEn)}</p>`;
-    if (day.titleLa) html += `<p class="title-en la" lang="la" translate="yes">${esc(day.titleLa)}</p>`;
+    if (day.titleLa) html += `<p class="title-la" lang="la" translate="yes">${esc(day.titleLa)}</p>`;
     for (const s of day.sections) {
       if (s.kind === "divider") {
         const [h, ...more] = s.lines;
@@ -125,11 +136,22 @@
   $("next").onclick = () => show(addDays(current, 1));
   $("today").onclick = () => show(hkToday());
   $("tRuby").onclick = () => { settings.ruby = !settings.ruby; saveSettings(); applySettings(); };
-  $("tEn").onclick = () => { settings.en = !settings.en; saveSettings(); applySettings(); };
-  // Latin exists only for the propers, so switching it on shows them; hiding the propers hides Latin.
-  $("tLa").onclick = () => { settings.la = !settings.la; if (settings.la) settings.propers = true; saveSettings(); applySettings(); };
-  $("tProp").onclick = () => { settings.propers = !settings.propers; if (!settings.propers) settings.la = false; saveSettings(); applySettings(); };
-  $("tSize").onclick = () => { const open = $("sizes").hidden; $("sizes").hidden = !open; $("tSize").setAttribute("aria-pressed", String(open)); };
+  // The 讀 / 禱 / Aa coins open their option rows; only one row is open at a time.
+  const PANELS = { tRead: "readOpts", tProp: "propOpts", tSize: "sizes" };
+  function openPanel(btnId) {
+    for (const [b, panel] of Object.entries(PANELS)) {
+      const open = b === btnId && $(panel).hidden;
+      $(panel).hidden = !open;
+      $(b).setAttribute("aria-expanded", String(open));
+    }
+  }
+  for (const b of Object.keys(PANELS)) $(b).onclick = () => openPanel(b);
+  // Group chips: Chinese is the group itself; a translation switches the group on with it.
+  $("readZh").onclick = () => { settings.read = !settings.read; saveSettings(); applySettings(); };
+  $("readEn").onclick = () => { if (!settings.read) { settings.read = true; settings.readEn = true; } else settings.readEn = !settings.readEn; saveSettings(); applySettings(); };
+  $("propZh").onclick = () => { settings.prop = !settings.prop; saveSettings(); applySettings(); };
+  $("propEn").onclick = () => { if (!settings.prop) { settings.prop = true; settings.propEn = true; } else settings.propEn = !settings.propEn; saveSettings(); applySettings(); };
+  $("propLa").onclick = () => { if (!settings.prop) { settings.prop = true; settings.propLa = true; } else settings.propLa = !settings.propLa; saveSettings(); applySettings(); };
   $("rtSize").oninput = (e) => { settings.rtSize = Number(e.target.value); saveSettings(); applySettings(); };
   $("zhSize").oninput = (e) => { settings.zhSize = Number(e.target.value); saveSettings(); applySettings(); };
   window.addEventListener("hashchange", () => { const d = dateFromHash(); if (d && d !== current) show(d); });

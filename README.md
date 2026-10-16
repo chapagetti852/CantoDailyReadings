@@ -46,14 +46,14 @@ bible.usccb.org/bible/<book>/<ch> ──► scripts/lib/nabre.mjs (NABRE verses 
   (and, if present, communion antiphon) cites the same passage as the Hong Kong page,
   allowing for Vulgate psalm numbering, so a saint's day that differs between calendars
   gets no English rather than the wrong prayers. Latin is taken from the same formulary.
-  The LA toggle shows Latin; it is off by default.
-  The day's name is shown in English under the Chinese title when EN is on: the USCCB
-  page's title when it is the same day, otherwise a translation of the Hong Kong ferial
-  or Sunday title (`scripts/lib/daytitle.mjs`).
-- **App.** `site/` is plain HTML/CSS/JS: date arrows and swipe; 粵 / 英 / 拉 / 禱 toggles
-  (Yale, English, Latin, propers; Latin switches the propers on since only they have Latin);
-  separate sliders for the Yale and the Chinese text size; dark mode; offline cache of
-  visited days via a service worker; installable to the home screen. The page is marked `translate="no"` so browsers do not offer to translate
+  The day's name is always shown in Latin under the Chinese title: on memorials and
+  feasts from iBreviary's Latin Breviary page, otherwise a rendering of the Hong Kong
+  ferial or Sunday title in the Ordo's style (`scripts/lib/daytitle.mjs`).
+- **App.** `site/` is plain HTML/CSS/JS: date arrows and swipe; a 粵 toggle for Yale and
+  讀 / 禱 drop-downs for the readings and the propers, each with 中文 (the group itself)
+  plus English, and Latine for the propers; separate sliders for the Yale and the Chinese
+  text size; dark mode; offline cache of visited days via a service worker; installable
+  to the home screen. The page is marked `translate="no"` so browsers do not offer to translate
   the Chinese; the English blocks are marked `lang="en"`.
 
 ## Setup (once)

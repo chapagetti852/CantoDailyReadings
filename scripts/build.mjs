@@ -179,6 +179,10 @@ for (const date of dates) {
   else titleEn = ferialEn ?? (usFeast ? null : usTitle);
   let titleLa = null;
   for (const t of page.title) { titleLa = latinDayTitle(t); if (titleLa) break; }
+  if (english && hkFeast) {
+    const fromBreviary = await ib.latinTitle(date);
+    if (fromBreviary) titleLa = fromBreviary;
+  }
   // The acclamation has no citation on the HK page; when the Gospel of the same
   // day matches the US lectionary, its acclamation is used too.
   async function attachAlleluia() {

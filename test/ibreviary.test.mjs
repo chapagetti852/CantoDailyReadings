@@ -69,3 +69,10 @@ test("Latin-1 entities decode", async () => {
   const { decodeEntities } = await import("../scripts/lib/html.mjs");
   assert.equal(decodeEntities("D&oacute;mine, qu&aelig;sumus, &Aacute;ngelus &ndash; test"), "Dómine, quæsumus, Ángelus – test");
 });
+
+test("latin day title picked from a breviary menu page", () => {
+  const lines = ["Breviarium", "Lectionis", "Orationis", "Missale", "Cetera", "Breviarium", "Die 17 octobris", "S. Ignatii Antiocheni, episcopi et martyris", "Memoria", "Invitatorium", "Ad Officium lectionis", "Ad Laudes matutinas", "- Menu -"];
+  assert.equal(IBreviary.pickLatinTitle(lines), "S. Ignatii Antiocheni, episcopi et martyris");
+  assert.equal(IBreviary.pickLatinTitle(["Breviarium", "Feria VI hebdomadae XXVIII per annum", "Invitatorium"]), "Feria VI hebdomadae XXVIII per annum");
+  assert.equal(IBreviary.pickLatinTitle(["Breviarium", "Invitatorium"]), null);
+});
