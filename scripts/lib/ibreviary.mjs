@@ -61,7 +61,7 @@ export function parsePages(pages) {
 
 const RUBRIC_LINE = /\bis (said|sung|omitted)\.?$|^(or|or:|vel|oppure)$/i;
 
-export function parseMissalLines(lines, antiphonKind = "entrance") {
+export function parseMissalLines(lines, antiphonKind = null) {
   const blocks = [];
   const title = [];
   let cur = null;
@@ -69,7 +69,7 @@ export function parseMissalLines(lines, antiphonKind = "entrance") {
     const line = raw.replace(/\s+/g, " ").trim();
     if (RUBRIC_LINE.test(line)) continue;
     let km = KIND_OF_HEADING.find(([, re]) => re.test(line) && line.length < 60);
-    if (!km && /^(antiphon|antiphona|antifona)$/i.test(line) && antiphonKind) km = [antiphonKind];
+    if (!km && /^(antiphon|antiphona|antifona)$/i.test(line)) km = [antiphonKind ?? "entrance"];
     // A sub-page carries only its own antiphon, whatever the label says (the Latin
     // communion page labels it like an entrance antiphon).
     if (km && antiphonKind && (km[0] === "entrance" || km[0] === "communion")) km = [antiphonKind];
