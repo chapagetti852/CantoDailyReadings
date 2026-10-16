@@ -29,14 +29,20 @@ bible.usccb.org/bible/<book>/<ch> ──► scripts/lib/nabre.mjs (NABRE verses 
 - **Romanization.** `to-jyutping` (BSD-2, built on the CC-BY rime-cantonese lexicon) gives
   word-aware Jyutping; a small converter turns it into Yale with diacritics (tone 1 = macron).
   Fix a mispronunciation by adding the word to `overrides.json`.
-- **English.** Guaranteed to match the Hong Kong day because it is driven by the citation on
-  the Chinese page, not by a foreign calendar. Verses come from the NABRE chapter pages on
-  the USCCB website, fetched once per chapter and kept in the Actions cache. NABRE and 思高
-  share the Hebrew chapter/verse numbering, so no re-versification is needed. Prayers and
-  antiphons without a citation are Chinese only.
+- **English.** Only for the readings, psalm and Gospel, and only official text. Driven by
+  the citation on the Chinese page, so it always matches the Hong Kong day:
+  1. If the USCCB daily readings page for the same date reads the same passage (verse
+     overlap of 80% or more), its Lectionary wording is used; the Gospel acclamation comes
+     along when the Gospel matches.
+  2. Otherwise the cited verses are taken from the NABRE chapter pages on the USCCB site.
+  Pages are fetched politely (one every few seconds, retry with backoff, a per-run cap, and
+  a stop on persistent 403) and kept in the Actions cache, so each page is fetched once.
+  NABRE and 思高 share the Hebrew chapter/verse numbering, so no re-versification is needed.
+  Antiphons, collects and other prayers are Chinese only.
 - **App.** `site/` is plain HTML/CSS/JS: date arrows and swipe, Yale and EN toggles, text
   size, dark mode, offline cache of visited days via a service worker, installable to the
-  home screen.
+  home screen. The page is marked `translate="no"` so browsers do not offer to translate
+  the Chinese; the English blocks are marked `lang="en"`.
 
 ## Setup (once)
 

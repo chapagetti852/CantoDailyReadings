@@ -24,3 +24,18 @@ for (const f of ["mt-sample.htm", "mt-sample-big5.htm"]) {
   });
 }
 
+
+test("second formulary becomes a divider; biography goes to notes", () => {
+  const page = parseDlcHtml(new Uint8Array(readFileSync("test/fixtures/mt-sample-sets.htm")));
+  assert.deepEqual(page.title, ["十月二十二日", "常年期第二十九周星期四"]);
+  const kinds = page.sections.map((s) => s.kind);
+  assert.deepEqual(kinds, ["entrance", "collect", "reading1", "psalm", "alleluia", "gospel", "offertory", "communion", "postcommunion",
+    "divider", "entrance", "collect", "offertory", "communion", "postcommunion"]);
+  const div = page.sections[9];
+  assert.equal(div.heading, "聖若望保祿二世（教宗）（自由紀念）");
+  assert.equal(page.notes.length, 1);
+  assert.match(page.notes[0], /^教宗若望保祿二世原名/);
+  assert.equal(page.sections.find((s) => s.kind === "reading1").citation.text, "弗 3:14-21");
+  assert.equal(page.sections.find((s) => s.kind === "gospel").citation.text, "路 12:49-53");
+  assert.equal(page.sections[8].lines.at(-1), "上主，求你恩賜我們。亞孟。", "biography not left in postcommunion");
+});

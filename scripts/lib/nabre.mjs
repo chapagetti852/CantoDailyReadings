@@ -9,6 +9,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { decodeEntities, htmlToLines } from "./html.mjs";
 import { expandVerses } from "./citation.mjs";
+import { PoliteFetcher } from "./polite.mjs";
 
 export const BASE = "https://bible.usccb.org/bible/";
 export const SLUG = {
@@ -108,9 +109,9 @@ export function parseChapterHtml(html) {
 // Fetching with disk cache
 // ---------------------------------------------------------------------------
 export class Nabre {
-  constructor({ cacheDir = "cache/nabre", fetchImpl = fetch, delayMs = 600, log = console } = {}) {
-    this.cacheDir = cacheDir; this.fetchImpl = fetchImpl; this.delayMs = delayMs; this.log = log;
-    this.mem = new Map(); this.lastFetch = 0; this.fetched = 0; this.failed = [];
+  constructor({ cacheDir = "cache/nabre", fetcher, log = console } = {}) {
+    this.cacheDir = cacheDir; this.fetcher = fetcher ?? new PoliteFetcher({ log }); this.log = log;
+    this.mem = new Map(); this.fetched = 0; this.failed = [];
   }
 
   cachePath(book, chapter) { return join(this.cacheDir, book, `${chapter}.json`); }
@@ -137,23 +138,9 @@ export class Nabre {
 
   async download(book, chapter) {
     for (const url of chapterUrls(book, chapter)) {
-      const wait = this.lastFetch + this.delayMs - Date.now();
-      if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-      this.lastFetch = Date.now();
-      let res;
-      try {
-        res = await this.fetchImpl(url, {
-          signal: AbortSignal.timeout(25000),
-          headers: {
-            "user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
-            accept: "text/html,application/xhtml+xml",
-            "accept-language": "en-US,en;q=0.9",
-          },
-        });
-      } catch (e) { this.failed.push(`${url}: ${e.message}`); continue; }
-      if (res.status === 404) continue;
-      if (!res.ok) { this.failed.push(`${url}: HTTP ${res.status}`); continue; }
-      const html = await res.text();
+      const { status, html } = await this.fetcher.get(url);
+      if (status === 404) continue;
+      if (!html) return null; // blocked, capped or failed: already recorded by the fetcher
       this.fetched++;
       const { verses, markerPattern } = parseChapterHtml(html);
       if (!verses.size) {

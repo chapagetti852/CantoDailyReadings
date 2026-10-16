@@ -34,11 +34,13 @@ const HEADERS = [
   ["blessing", /^(隆重)?降福/, false],
 ];
 export const SCRIPTURE_KINDS = new Set(HEADERS.filter((h) => h[2]).map((h) => h[0]));
+// Kinds whose English is looked up from the NABRE chapter text when no lectionary block matches.
+export const CHAPTER_KINDS = new Set(["reading1", "reading2", "psalm", "gospel"]);
 export const KIND_LABEL = Object.fromEntries([
   ["entrance", "進堂詠"], ["collect", "集禱經"], ["reading1", "讀經一"], ["psalm", "答唱詠"],
   ["reading2", "讀經二"], ["sequence", "繼抒詠"], ["alleluia", "福音前歡呼"], ["gospel", "福音"],
   ["intercessions", "信友禱文"], ["offertory", "獻禮經"], ["preface", "頌謝詞"], ["communion", "領主詠"],
-  ["postcommunion", "領聖體後經"], ["blessing", "降福"],
+  ["postcommunion", "領聖體後經"], ["blessing", "降福"], ["divider", ""], ["note", "簡介"],
 ]);
 
 const NOISE = /首頁|返回|回上頁|每日彌撒讀經|禮儀委員會|版權|copyright|©|http|www\.|\.htm|下一[天日]|上一[天日]|翻譯|所有/i;
@@ -50,17 +52,40 @@ function headerFor(line) {
   return null;
 }
 
-/** @returns {{title:string[], pageTitle:string, sections:object[], charset:string, lineCount:number}} */
+const TITLE_MAX = 36;
+const looksLikeTitle = (l) => l.length <= TITLE_MAX && !/[。；！？]/.test(l) && !/^[「【]/.test(l);
+const isBiography = (l) => l.length > 120 && /。/.test(l);
+
+/**
+ * @returns {{title:string[], notes:string[], pageTitle:string, sections:object[], charset:string, lineCount:number}}
+ * sections may include kind "divider" (start of an alternative formulary / set
+ * of prayers, e.g. 第二式 or an optional memorial) and are otherwise in page order.
+ */
 export function parseDlcHtml(bytes) {
   const { text: html, charset } = decodeHtml(bytes);
   const lines = htmlToLines(html);
   const pageTitle = titleOf(html);
   const sections = [];
   const title = [];
+  const notes = [];
   let cur = null;
+  let seenInSet = new Set();
   for (const line of lines) {
     const kind = headerFor(line);
     if (kind) {
+      if (seenInSet.has(kind)) {
+        // A repeated heading means a second formulary. Lines that trail the
+        // previous section and look like a title become the divider's title.
+        const divTitle = [];
+        const prev = sections[sections.length - 1];
+        const bio = [];
+        while (prev && prev.lines.length > 1 && isBiography(prev.lines[prev.lines.length - 1])) bio.unshift(prev.lines.pop());
+        while (prev && prev.lines.length && looksLikeTitle(prev.lines[prev.lines.length - 1]) && divTitle.length < 4) divTitle.unshift(prev.lines.pop());
+        notes.push(...bio);
+        sections.push({ kind: "divider", label: divTitle[0] ?? "另一式", heading: divTitle[0] ?? "", citation: null, lines: divTitle.slice(1) });
+        seenInSet = new Set();
+      }
+      seenInSet.add(kind);
       cur = { kind, label: KIND_LABEL[kind], heading: line, citation: null, lines: [] };
       sections.push(cur);
       const c = parseCitation(line);
@@ -68,10 +93,10 @@ export function parseDlcHtml(bytes) {
       continue;
     }
     if (!cur) {
-      if (!NOISE.test(line)) title.push(line);
+      if (NOISE.test(line)) continue;
+      if (looksLikeTitle(line)) title.push(line); else notes.push(line);
       continue;
     }
-    // A citation line near the top of a scripture section
     if (!cur.citation && cur.lines.length < 3 && CITE_RE.test(line)) {
       const c = parseCitation(line);
       if (c) cur.citation = c;
@@ -79,11 +104,15 @@ export function parseDlcHtml(bytes) {
     if (NOISE.test(line) && line.length < 30) continue;
     cur.lines.push(line);
   }
-  // Drop a trailing navigation block, if any slipped through.
   for (const s of sections) {
     while (s.lines.length && NOISE.test(s.lines[s.lines.length - 1])) s.lines.pop();
   }
-  return { title: title.slice(0, 6), pageTitle, sections, charset, lineCount: lines.length };
+  // Long paragraphs that trail the last section are usually a saint's biography.
+  const last = sections[sections.length - 1];
+  if (last && last.kind !== "divider") {
+    while (last.lines.length > 1 && isBiography(last.lines[last.lines.length - 1])) notes.push(last.lines.pop());
+  }
+  return { title: title.slice(0, 6), notes, pageTitle, sections, charset, lineCount: lines.length };
 }
 
 export async function fetchDlc(isoDate, { fetchImpl = fetch, timeoutMs = 20000 } = {}) {

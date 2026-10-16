@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, rmSync, existsSync } from "node:fs";
 import { parseChapterHtml, chapterUrls, Nabre } from "../scripts/lib/nabre.mjs";
+import { PoliteFetcher } from "../scripts/lib/polite.mjs";
 import { parseCitation } from "../scripts/lib/citation.mjs";
 
 test("chapter urls", () => {
@@ -32,14 +33,14 @@ test("lookup fetches once per chapter and caches to disk", async () => {
   rmSync(dir, { recursive: true, force: true });
   const html = readFileSync("test/fixtures/nabre-mark-6.html", "utf8");
   let calls = 0;
-  const fetchImpl = async (url) => { calls++; return { ok: url.endsWith("/mark/6"), status: url.endsWith("/mark/6") ? 200 : 404, text: async () => html }; };
-  const n = new Nabre({ cacheDir: dir, fetchImpl, delayMs: 0, log: { warn() {} } });
+  const fetchImpl = async (url) => { calls++; return { ok: url.endsWith("/mark/6"), status: url.endsWith("/mark/6") ? 200 : 404, text: async () => html, headers: new Map() }; };
+  const n = new Nabre({ cacheDir: dir, fetcher: new PoliteFetcher({ fetchImpl, delayMs: 0 }), log: { warn() {} } });
   const r = await n.lookup(parseCitation("谷 6:14-29"));
   assert.deepEqual(r.verses.map((v) => v.ref), ["6:14", "6:15", "6:16", "6:17"]);
   assert.equal(r.missing.length, 12);
   assert.equal(calls, 1);
   assert.ok(existsSync(`${dir}/MRK/6.json`));
-  const n2 = new Nabre({ cacheDir: dir, fetchImpl, delayMs: 0 });
+  const n2 = new Nabre({ cacheDir: dir, fetcher: new PoliteFetcher({ fetchImpl, delayMs: 0 }) });
   await n2.lookup(parseCitation("谷 6:16"));
   assert.equal(calls, 1, "second instance served from disk cache");
   rmSync(dir, { recursive: true, force: true });

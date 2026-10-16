@@ -13,7 +13,9 @@
 //   env WINDOW_BACK=3 WINDOW_AHEAD=14
 import { mkdirSync, writeFileSync, readFileSync, cpSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { fetchDlc, parseDlcHtml, dlcUrl } from "./lib/dlc.mjs";
+import { fetchDlc, parseDlcHtml, CHAPTER_KINDS } from "./lib/dlc.mjs";
+import { Lectionary } from "./lib/lectionary.mjs";
+import { PoliteFetcher } from "./lib/polite.mjs";
 import { makeRomanizer } from "./lib/yale.mjs";
 import { Nabre } from "./lib/nabre.mjs";
 import { htmlToLines, decodeHtml } from "./lib/html.mjs";
@@ -48,7 +50,10 @@ const dates = opt("--dates")
 
 const overrides = Object.fromEntries(Object.entries(existsSync("overrides.json") ? JSON.parse(readFileSync("overrides.json", "utf8")) : {}).filter(([k]) => !k.startsWith("_")));
 const romanize = makeRomanizer(overrides);
-const nabre = has("--no-english") ? null : new Nabre();
+const english = !has("--no-english");
+const fetcher = new PoliteFetcher({ maxFetches: Number(process.env.MAX_FETCHES ?? 60) });
+const nabre = english ? new Nabre({ fetcher }) : null;
+const lect = english ? new Lectionary({ fetcher }) : null;
 
 const fixture = opt("--fixture");
 const built = [];
@@ -81,16 +86,37 @@ for (const date of dates) {
   }
 
   const sections = [];
+  let gospelMatched = false;
+  let setStart = 0;
   for (const s of page.sections) {
-    const lines = s.lines.map((l) => romanize(l));
+    const lines = (s.kind === "divider" && s.heading ? [s.heading, ...s.lines] : s.lines).map((l) => romanize(l));
     const out = { kind: s.kind, label: s.label, heading: s.heading, citation: s.citation?.text ?? null, lines };
-    if (nabre && s.citation) {
-      const { verses, missing } = await nabre.lookup(s.citation);
-      if (verses.length) out.en = { source: "NABRE", book: s.citation.book, verses };
-      if (missing.length) out.enMissing = missing;
+    if (english && CHAPTER_KINDS.has(s.kind) && s.citation) {
+      // 1. Exact lectionary wording from the USCCB daily readings page when the same passage is read there.
+      const m = await lect.match(date, s.citation, { kind: s.kind });
+      if (m) {
+        out.en = { source: "Lectionary", citation: m.citation, lines: m.lines };
+        if (s.kind === "gospel") gospelMatched = true;
+      } else {
+        // 2. Otherwise the NABRE chapter text for the cited verses.
+        const { verses, missing } = await nabre.lookup(s.citation);
+        if (verses.length) out.en = { source: "NABRE", book: s.citation.book, verses };
+        if (missing.length) out.enMissing = missing;
+      }
     }
+    if (s.kind === "divider") { await attachAlleluia(); gospelMatched = false; setStart = sections.length + 1; }
     sections.push(out);
   }
+  await attachAlleluia();
+  // The acclamation has no citation on the HK page; when the Gospel of the same
+  // day matches the US lectionary, its acclamation is used too.
+  async function attachAlleluia() {
+    if (!english || !gospelMatched) return;
+    const a = sections.slice(setStart).find((x) => x.kind === "alleluia" && !x.en);
+    const b = a && await lect.blockOfKind(date, "alleluia");
+    if (b) a.en = { source: "Lectionary", citation: b.citation, lines: b.lines };
+  }
+  if (page.notes.length) sections.push({ kind: "note", label: "簡介", heading: "", citation: null, lines: page.notes.map((l) => romanize(l)) });
 
   const day = {
     date,
@@ -101,7 +127,7 @@ for (const date of dates) {
   };
   writeFileSync(join(DATA, `${date}.json`), JSON.stringify(day));
   built.push(date);
-  const kinds = sections.map((s) => s.kind + (s.en ? "+en" : "")).join(" ");
+  const kinds = sections.map((s) => s.kind + (s.en ? (s.en.source === "Lectionary" ? "+lect" : "+nabre") : "")).join(" ");
   console.log(`${date}: ${sections.length} sections [${kinds}] title="${page.title.join(" / ")}"`);
 }
 
@@ -112,8 +138,10 @@ cpSync("site", OUT, { recursive: true });
 writeFileSync(join(OUT, "robots.txt"), "User-agent: *\nDisallow: /\n");
 
 console.log(`\nBuilt ${built.length}/${dates.length} days into ${OUT}/`);
-if (nabre) {
-  console.log(`NABRE: ${nabre.fetched} chapter pages fetched this run, ${nabre.mem.size} chapters used`);
+if (english) {
+  console.log(`USCCB: ${fetcher.count} requests this run; ${lect.fetched} readings pages and ${nabre.fetched} chapter pages fetched; ${nabre.mem.size} chapters used`);
+  for (const f of fetcher.failed) console.warn("! fetch " + f);
+  for (const f of lect.failed) console.warn("! Lectionary " + f);
   for (const f of nabre.failed) console.warn("! NABRE " + f);
 }
 for (const p of problems) console.warn("! " + p);

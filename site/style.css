@@ -29,6 +29,8 @@ h2 { font-size: .85rem; letter-spacing: .08em; color: var(--accent); margin: 1.8
 h2 small { color: var(--muted); letter-spacing: 0; margin-left: .6em; font-weight: normal; }
 p.zh { margin: 0 0 .5rem; text-align: start; line-height: 2.5; }
 p.zh.resp { font-weight: 600; }
+p.zh.rubric { color: var(--muted); font-size: .85rem; line-height: 1.8; }
+h1.divider { margin-top: 2.5rem; padding-top: 1rem; border-top: 2px solid var(--line); }
 ruby { ruby-position: over; ruby-align: center; }
 rt { font-size: .5em; color: var(--rt); font-family: system-ui, -apple-system, sans-serif; padding: 0 .2em; letter-spacing: 0; }
 body.noruby rt { display: none; }

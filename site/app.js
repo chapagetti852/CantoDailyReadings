@@ -32,21 +32,42 @@
     return out;
   }
 
+  const RUBRIC = /^（[^）]*）$|^或$|^\(.*\)$/;
+
+  function enHtml(s) {
+    if (!s.en) return "";
+    const src = s.en.source === "Lectionary"
+      ? `Lectionary (USCCB)${s.en.citation ? " · " + esc(s.en.citation) : ""}`
+      : "New American Bible, Revised Edition";
+    let body;
+    if (s.en.verses) {
+      body = s.en.verses.map((v) => `<sup>${esc(v.ref.split(":")[1])}</sup>${esc(v.text)}`).join(" ");
+    } else {
+      const keepLines = s.kind === "psalm" || s.kind === "alleluia" || s.kind === "sequence";
+      const ls = s.en.lines.map((l) => (/^R\.|^R:/.test(l) ? `<b>${esc(l)}</b>` : esc(l)));
+      body = keepLines ? ls.join("<br>") : ls.join(" ");
+    }
+    return `<p class="en" lang="en" translate="yes">${body}<span class="src">${src}</span></p>`;
+  }
+
   function render(day) {
     let html = "";
     const [first, ...rest] = day.title;
     if (first) html += `<h1>${rubyHtml(first)}</h1>`;
     for (const t of rest) html += `<p class="title-sub">${rubyHtml(t)}</p>`;
     for (const s of day.sections) {
+      if (s.kind === "divider") {
+        const [h, ...more] = s.lines;
+        html += `<h1 class="divider">${h ? rubyHtml(h) : esc(s.label)}</h1>`;
+        for (const line of more) html += `<p class="title-sub">${rubyHtml(line)}</p>`;
+        continue;
+      }
       html += `<h2>${esc(s.label)}${s.citation ? `<small>${esc(s.citation)}</small>` : ""}</h2>`;
       for (const line of s.lines) {
-        const resp = /^【答】|^答[:：]/.test(line.zh);
-        html += `<p class="zh${resp ? " resp" : ""}">${rubyHtml(line)}</p>`;
+        const cls = RUBRIC.test(line.zh) ? "zh rubric" : /^【答】|^答[:：]/.test(line.zh) ? "zh resp" : "zh";
+        html += `<p class="${cls}">${rubyHtml(line)}</p>`;
       }
-      if (s.en && s.en.verses.length) {
-        const body = s.en.verses.map((v) => `<sup>${esc(v.ref.split(":")[1])}</sup>${esc(v.text)}`).join(" ");
-        html += `<p class="en">${body}<span class="src">${esc(s.en.source === "NABRE" ? "New American Bible, Revised Edition" : s.en.source)}</span></p>`;
-      }
+      html += enHtml(s);
     }
     main.innerHTML = html;
     $("src").textContent = day.source && day.source.startsWith("http") ? `來源：${day.source} · 建於 ${day.generated.slice(0, 10)}` : "";
