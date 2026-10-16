@@ -32,45 +32,57 @@
     return out;
   }
 
+  // "領：" / "眾：" / "【答】" are rubrical labels, not text to be read with romanization.
+  const SPEAKER = /^(領|眾|答|主祭|司鐸|讀經員|全體|信友|執事)[：:]\s*/;
+  function lineHtml(line) {
+    let zh = line.zh, yale = line.yale, label = "";
+    const m = SPEAKER.exec(zh);
+    if (m) { label = `<span class="who">${esc(m[1])}</span>`; zh = zh.slice(m[0].length); yale = yale.slice(Array.from(m[0]).length); }
+    let body = rubyHtml({ zh, yale });
+    body = body.replace(/(?:<ruby>【<rt>[^<]*<\/rt><\/ruby>|【)(?:<ruby>答<rt>[^<]*<\/rt><\/ruby>|答)(?:<ruby>】<rt>[^<]*<\/rt><\/ruby>|】)/g, '<span class="who resp-mark">答</span>');
+    return label + body;
+  }
+
   const RUBRIC = /^（[^）]*）$|^或$|^\(.*\)$/;
 
   function enHtml(s) {
     if (!s.en) return "";
-    const src = s.en.source === "Lectionary"
-      ? `Lectionary (USCCB)${s.en.citation ? " · " + esc(s.en.citation) : ""}`
-      : "New American Bible, Revised Edition";
     let body;
     if (s.en.verses) {
       body = s.en.verses.map((v) => `<sup>${esc(v.ref.split(":")[1])}</sup>${esc(v.text)}`).join(" ");
     } else {
       const keepLines = s.kind === "psalm" || s.kind === "alleluia" || s.kind === "sequence";
-      const ls = s.en.lines.map((l) => (/^R\.|^R:/.test(l) ? `<b>${esc(l)}</b>` : esc(l)));
+      const ls = s.en.lines.map((l) => (/^R\.|^R:/.test(l) ? `<b>${esc(l.replace(/^R\.?\s*(\([^)]*\))?\s*/, "℟. "))}</b>` : esc(l)));
       body = keepLines ? ls.join("<br>") : ls.join(" ");
     }
-    return `<p class="en" lang="en" translate="yes">${body}<span class="src">${src}</span></p>`;
+    return `<p class="en" lang="en" translate="yes">${body}</p>`;
   }
 
   function render(day) {
     let html = "";
     const [first, ...rest] = day.title;
-    if (first) html += `<h1>${rubyHtml(first)}</h1>`;
-    for (const t of rest) html += `<p class="title-sub">${rubyHtml(t)}</p>`;
+    if (first) html += `<h1>${esc(first.zh)}</h1>`;
+    for (const t of rest) html += `<p class="title-sub">${esc(t.zh)}</p>`;
     for (const s of day.sections) {
       if (s.kind === "divider") {
         const [h, ...more] = s.lines;
-        html += `<h1 class="divider">${h ? rubyHtml(h) : esc(s.label)}</h1>`;
-        for (const line of more) html += `<p class="title-sub">${rubyHtml(line)}</p>`;
+        html += `<h1 class="divider">${h ? esc(h.zh) : esc(s.label)}</h1>`;
+        for (const line of more) html += `<p class="title-sub">${esc(line.zh)}</p>`;
         continue;
       }
-      html += `<h2>${esc(s.label)}${s.citation ? `<small>${esc(s.citation)}</small>` : ""}</h2>`;
+      if (s.kind === "note") {
+        html += `<details class="note"><summary>${esc(s.label)}</summary>${s.lines.map((l) => `<p class="zh">${lineHtml(l)}</p>`).join("")}</details>`;
+        continue;
+      }
+      html += `<h2><span>${esc(s.label)}</span>${s.citation ? `<small>${esc(s.citation)}</small>` : ""}</h2>`;
       for (const line of s.lines) {
         const cls = RUBRIC.test(line.zh) ? "zh rubric" : /^【答】|^答[:：]/.test(line.zh) ? "zh resp" : "zh";
-        html += `<p class="${cls}">${rubyHtml(line)}</p>`;
+        html += `<p class="${cls}">${RUBRIC.test(line.zh) ? esc(line.zh) : lineHtml(line)}</p>`;
       }
       html += enHtml(s);
     }
     main.innerHTML = html;
-    $("src").textContent = day.source && day.source.startsWith("http") ? `來源：${day.source} · 建於 ${day.generated.slice(0, 10)}` : "";
+    $("src").textContent = day.source && day.source.startsWith("http") ? `來源：${day.source.replace(/^https?:\/\//, "")} · ${day.generated.slice(0, 10)}` : "";
   }
 
   let current = null;
@@ -100,7 +112,7 @@
   $("tRuby").onclick = () => { settings.ruby = !settings.ruby; saveSettings(); applySettings(); };
   $("tEn").onclick = () => { settings.en = !settings.en; saveSettings(); applySettings(); };
   $("sizeDown").onclick = () => { settings.size = Math.max(14, settings.size - 1); saveSettings(); applySettings(); };
-  $("sizeUp").onclick = () => { settings.size = Math.min(28, settings.size + 1); saveSettings(); applySettings(); };
+  $("sizeUp").onclick = () => { settings.size = Math.min(34, settings.size + 1); saveSettings(); applySettings(); };
   window.addEventListener("hashchange", () => { const d = dateFromHash(); if (d && d !== current) show(d); });
 
   // Swipe left/right to change day

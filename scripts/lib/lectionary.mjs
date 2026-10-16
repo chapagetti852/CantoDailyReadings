@@ -67,6 +67,9 @@ export function parseUsCitation(text) {
   return verses.size ? { book, verses, raw: t } : null;
 }
 
+// Anything from here on is page furniture, not the reading.
+const STOP_RE = /^(?:Get Daily Readings|Sign up|Lectionary for Mass for Use|Copyright|©|Share|Listen|Audio|Video|Reflection|Daily Readings|Readings for|Donate|Back to|Print|Email|USCCB|Terms|Privacy|Follow|Subscribe)/i;
+
 const KIND_OF_HEADING = [
   ["reading1", /reading\s*(?:1|i)\b|first reading/i],
   ["reading2", /reading\s*(?:2|ii)\b|second reading/i],
@@ -92,7 +95,11 @@ export function parseReadingsHtml(html) {
     const kindEntry = KIND_OF_HEADING.find(([, re]) => re.test(heading));
     if (!kindEntry) continue;
     const rest = piece.slice(end + 5).split(/<h2\b/i)[0];
-    const lines = htmlToLines(rest);
+    const cb = /<div[^>]*class="[^"]*\bcontent-body\b[^"]*"[^>]*>([\s\S]*?)<\/div>/i.exec(rest);
+    const head = cb ? rest.slice(0, cb.index) : rest;
+    let lines = htmlToLines(cb ? head + "\n" + cb[1] : rest);
+    const stop = lines.findIndex((l) => STOP_RE.test(l));
+    if (stop > 0) lines = lines.slice(0, stop);
     let citation = null, start = 0;
     for (let i = 0; i < Math.min(lines.length, 4); i++) {
       const c = parseUsCitation(lines[i].replace(/^(?:Lectionary.*)$/i, ""));

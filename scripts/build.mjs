@@ -155,6 +155,15 @@ for (const date of dates) {
     sections,
   };
   writeFileSync(join(DATA, `${date}.json`), JSON.stringify(day));
+  if (has("--dump") && built.length === 0) {
+    console.log(`\n===== parsed ${date} =====`);
+    for (const s of sections) {
+      console.log(`--- ${s.kind} ${s.citation ?? ""}`);
+      for (const l of s.lines.slice(0, 6)) console.log("  zh| " + l.zh.slice(0, 90));
+      if (s.en?.lines) for (const l of s.en.lines.slice(0, 40)) console.log("  en| " + l.slice(0, 110));
+      if (s.en?.verses) for (const v of s.en.verses.slice(0, 3)) console.log("  en| " + v.ref + " " + v.text.slice(0, 100));
+    }
+  }
   built.push(date);
   const kinds = sections.map((s) => s.kind + (s.en ? (s.en.source === "Lectionary" ? "+lect" : "+nabre") : "")).join(" ");
   console.log(`${date}: ${sections.length} sections [${kinds}] title="${page.title.join(" / ")}"`);
