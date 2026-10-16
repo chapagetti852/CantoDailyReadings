@@ -15,7 +15,7 @@ import { mkdirSync, writeFileSync, readFileSync, cpSync, existsSync } from "node
 import { join } from "node:path";
 import { fetchDlc, parseDlcHtml, CHAPTER_KINDS } from "./lib/dlc.mjs";
 import { Lectionary } from "./lib/lectionary.mjs";
-import { englishDayTitle } from "./lib/daytitle.mjs";
+import { englishDayTitle, latinDayTitle } from "./lib/daytitle.mjs";
 import { IBreviary } from "./lib/ibreviary.mjs";
 import { PoliteFetcher } from "./lib/polite.mjs";
 import { makeRomanizer } from "./lib/yale.mjs";
@@ -177,6 +177,8 @@ for (const date of dates) {
   let titleEn = null;
   if (hkFeast) titleEn = usFeast ? usTitle : ferialEn;
   else titleEn = ferialEn ?? (usFeast ? null : usTitle);
+  let titleLa = null;
+  for (const t of page.title) { titleLa = latinDayTitle(t); if (titleLa) break; }
   // The acclamation has no citation on the HK page; when the Gospel of the same
   // day matches the US lectionary, its acclamation is used too.
   async function attachAlleluia() {
@@ -192,6 +194,7 @@ for (const date of dates) {
     generated: new Date().toISOString(),
     title: page.title.map((t) => romanize(t)),
     titleEn,
+    titleLa,
     sections,
   };
   writeFileSync(join(DATA, `${date}.json`), JSON.stringify(day));

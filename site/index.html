@@ -27,13 +27,18 @@
   <button id="next" class="nav" aria-label="後一日">›</button>
 </header>
 <nav class="tools">
-  <button id="tRuby" aria-pressed="true" title="耶魯粵語拼音"><span class="coin"><span class="glyph">粵<small>YALE</small></span></span></button>
-  <button id="tEn" aria-pressed="true" title="English"><span class="coin"><svg viewBox="0 0 60 36" aria-hidden="true"><rect width="60" height="36" fill="#1b3a8a"/><path d="M0 0l60 36M60 0L0 36" stroke="#fff" stroke-width="7"/><path d="M0 0l60 36M60 0L0 36" stroke="#c8102e" stroke-width="2.5"/><path d="M30 0v36M0 18h60" stroke="#fff" stroke-width="11"/><path d="M30 0v36M0 18h60" stroke="#c8102e" stroke-width="6"/></svg></span></button>
-  <button id="tLa" aria-pressed="false" title="Latine"><span class="coin"><svg viewBox="0 0 36 36" aria-hidden="true"><rect width="18" height="36" fill="#f1c232"/><rect x="18" width="18" height="36" fill="#fff"/><g transform="translate(27 18)" fill="none" stroke-linecap="round"><g stroke="#b8860b" stroke-width="2.2"><path d="M-5 5l9-9"/><path d="M4-4l1.6 1.6M1.8-1.8L3.4-.2"/></g><g stroke="#8f8f8f" stroke-width="2.2"><path d="M5 5l-9-9"/><path d="M-4-4l-1.6 1.6M-1.8-1.8L-3.4-.2"/></g><circle cx="-5.6" cy="5.6" r="2.3" stroke="#b8860b" stroke-width="2"/><circle cx="5.6" cy="5.6" r="2.3" stroke="#8f8f8f" stroke-width="2"/></g></svg></span></button>
-  <button id="tProp" aria-pressed="false" title="進堂詠、集禱經、獻禮經、領主詠、領聖體後經"><span class="pill">禱文</span></button>
-  <span class="sp"></span>
-  <button id="sizeDown" class="size" aria-label="縮小">A−</button>
-  <button id="sizeUp" class="size" aria-label="放大">A+</button>
+  <div class="row">
+    <button id="tRuby" aria-pressed="true"><span class="coin"><span class="glyph">粵</span></span><span class="cap">Yale</span></button>
+    <button id="tEn" aria-pressed="true"><span class="coin"><span class="glyph">英</span></span><span class="cap">English</span></button>
+    <button id="tLa" aria-pressed="false"><span class="coin"><span class="glyph">拉</span></span><span class="cap">Latine</span></button>
+    <button id="tProp" aria-pressed="false"><span class="coin"><span class="glyph">禱</span></span><span class="cap">Propers</span></button>
+    <span class="sp"></span>
+    <button id="tSize" aria-pressed="false" aria-controls="sizes" aria-label="文字大小"><span class="coin"><span class="glyph aa">Aa</span></span><span class="cap">Size</span></button>
+  </div>
+  <div class="row sizes" id="sizes" hidden>
+    <label><span class="lab">粵拼</span><input id="rtSize" type="range" min="8" max="20" step="1"></label>
+    <label><span class="lab">漢字</span><input id="zhSize" type="range" min="15" max="32" step="1"></label>
+  </div>
 </nav>
 <main id="main"><p class="muted">載入中…</p></main>
 <footer class="foot">

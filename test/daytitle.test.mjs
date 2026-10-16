@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { englishDayTitle, zhNumber } from "../scripts/lib/daytitle.mjs";
+import { englishDayTitle, latinDayTitle, zhNumber } from "../scripts/lib/daytitle.mjs";
 import { parseDayTitle } from "../scripts/lib/lectionary.mjs";
 import { readFileSync } from "node:fs";
 
@@ -18,4 +18,11 @@ test("ferial and sunday titles", () => {
 test("USCCB day title", () => {
   assert.equal(parseDayTitle(readFileSync("test/fixtures/usccb-readings.html", "utf8")), "Friday of the Twenty-eighth Week in Ordinary Time");
   assert.equal(parseDayTitle("<html><head><title>Daily Readings | USCCB</title></head><body><h2>Memorial of Saint Luke</h2></body></html>"), "Memorial of Saint Luke");
+});
+
+test("latin titles", () => {
+  assert.equal(latinDayTitle("常年期第二十八周星期五"), "Feria VI hebdomadae XXVIII per annum");
+  assert.equal(latinDayTitle("常年期第三十主日"), "Dominica XXX per annum");
+  assert.equal(latinDayTitle("將臨期第一周星期六"), "Sabbato hebdomadae I Adventus");
+  assert.equal(latinDayTitle("十月十六日"), null);
 });

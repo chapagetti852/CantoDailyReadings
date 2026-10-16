@@ -50,9 +50,10 @@ bible.usccb.org/bible/<book>/<ch> ──► scripts/lib/nabre.mjs (NABRE verses 
   The day's name is shown in English under the Chinese title when EN is on: the USCCB
   page's title when it is the same day, otherwise a translation of the Hong Kong ferial
   or Sunday title (`scripts/lib/daytitle.mjs`).
-- **App.** `site/` is plain HTML/CSS/JS: date arrows and swipe, Yale and EN toggles, text
-  size, dark mode, offline cache of visited days via a service worker, installable to the
-  home screen. The page is marked `translate="no"` so browsers do not offer to translate
+- **App.** `site/` is plain HTML/CSS/JS: date arrows and swipe; 粵 / 英 / 拉 / 禱 toggles
+  (Yale, English, Latin, propers; Latin switches the propers on since only they have Latin);
+  separate sliders for the Yale and the Chinese text size; dark mode; offline cache of
+  visited days via a service worker; installable to the home screen. The page is marked `translate="no"` so browsers do not offer to translate
   the Chinese; the English blocks are marked `lang="en"`.
 
 ## Setup (once)

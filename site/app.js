@@ -5,7 +5,7 @@
   const HK_OFFSET = 8 * 3600e3;
   const WEEKDAY = ["日", "一", "二", "三", "四", "五", "六"];
 
-  let settings = { ruby: true, en: true, la: false, propers: false, size: 19 };
+  let settings = { ruby: true, en: true, la: false, propers: false, rtSize: 11, zhSize: 20 };
   try { Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}")); } catch {}
   const saveSettings = () => { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {} };
 
@@ -19,7 +19,9 @@
     document.body.classList.toggle("noen", !settings.en);
     document.body.classList.toggle("nola", !settings.la);
     document.body.classList.toggle("noprop", !settings.propers);
-    document.documentElement.style.setProperty("--base", settings.size + "px");
+    document.documentElement.style.setProperty("--rt-size", settings.rtSize + "px");
+    document.documentElement.style.setProperty("--zh-size", settings.zhSize + "px");
+    $("rtSize").value = settings.rtSize; $("zhSize").value = settings.zhSize;
     $("tRuby").setAttribute("aria-pressed", String(settings.ruby));
     $("tEn").setAttribute("aria-pressed", String(settings.en));
     $("tLa").setAttribute("aria-pressed", String(settings.la));
@@ -75,6 +77,7 @@
     if (first) html += `<h1>${esc(first.zh)}</h1>`;
     for (const t of rest) html += `<p class="title-sub">${esc(t.zh)}</p>`;
     if (day.titleEn) html += `<p class="title-en en" lang="en" translate="yes">${esc(day.titleEn)}</p>`;
+    if (day.titleLa) html += `<p class="title-en la" lang="la" translate="yes">${esc(day.titleLa)}</p>`;
     for (const s of day.sections) {
       if (s.kind === "divider") {
         const [h, ...more] = s.lines;
@@ -123,10 +126,12 @@
   $("today").onclick = () => show(hkToday());
   $("tRuby").onclick = () => { settings.ruby = !settings.ruby; saveSettings(); applySettings(); };
   $("tEn").onclick = () => { settings.en = !settings.en; saveSettings(); applySettings(); };
-  $("tLa").onclick = () => { settings.la = !settings.la; saveSettings(); applySettings(); };
-  $("tProp").onclick = () => { settings.propers = !settings.propers; saveSettings(); applySettings(); };
-  $("sizeDown").onclick = () => { settings.size = Math.max(14, settings.size - 1); saveSettings(); applySettings(); };
-  $("sizeUp").onclick = () => { settings.size = Math.min(34, settings.size + 1); saveSettings(); applySettings(); };
+  // Latin exists only for the propers, so switching it on shows them; hiding the propers hides Latin.
+  $("tLa").onclick = () => { settings.la = !settings.la; if (settings.la) settings.propers = true; saveSettings(); applySettings(); };
+  $("tProp").onclick = () => { settings.propers = !settings.propers; if (!settings.propers) settings.la = false; saveSettings(); applySettings(); };
+  $("tSize").onclick = () => { const open = $("sizes").hidden; $("sizes").hidden = !open; $("tSize").setAttribute("aria-pressed", String(open)); };
+  $("rtSize").oninput = (e) => { settings.rtSize = Number(e.target.value); saveSettings(); applySettings(); };
+  $("zhSize").oninput = (e) => { settings.zhSize = Number(e.target.value); saveSettings(); applySettings(); };
   window.addEventListener("hashchange", () => { const d = dateFromHash(); if (d && d !== current) show(d); });
 
   // Swipe left/right to change day
