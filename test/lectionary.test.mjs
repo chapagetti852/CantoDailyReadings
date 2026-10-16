@@ -90,7 +90,10 @@ test("a JavaScript challenge page is not retried and blocks only its class", asy
   const r = await f.get("https://bible.usccb.org/bible/isaiah/2");
   assert.equal(r.status, 403);
   assert.equal(calls, 1, "no retry on a challenge page");
-  assert.ok(f.blocked.has("chapter"));
-  assert.ok(!f.blocked.has("readings"));
+  assert.ok(!f.blocked.has("chapter"), "one challenge does not block the class");
   assert.match(f.failed[0], /challenge/);
+  for (const c of [3, 4, 5]) await f.get(`https://bible.usccb.org/bible/isaiah/${c}`);
+  assert.equal(calls, 4);
+  assert.ok(f.blocked.has("chapter"), "four in a row does");
+  assert.ok(!f.blocked.has("readings"));
 });

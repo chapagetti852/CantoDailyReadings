@@ -20,6 +20,7 @@ export class PoliteFetcher {
     this.retryWaitsMs = retryWaitsMs; this.log = log;
     this.sleep = sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
     this.lastAt = 0; this.count = 0; this.blocked = new Set(); this.failed = [];
+    this.consecutiveChallenges = 0; this.maxConsecutiveChallenges = 4;
     this.cookies = new Map(); // name -> value, sent back like a browser would
     this.lastUrl = null; this.diagnosed = false;
   }
@@ -80,7 +81,7 @@ export class PoliteFetcher {
         res = await this.fetchImpl(url, { signal: AbortSignal.timeout(30000), headers: this.headersFor(url), redirect: "follow" });
       } catch (e) { last = { status: -1, err: e.message }; continue; }
       this.rememberCookies(res);
-      if (res.ok) { this.lastUrl = url; return { status: res.status, html: await res.text() }; }
+      if (res.ok) { this.lastUrl = url; this.consecutiveChallenges = 0; return { status: res.status, html: await res.text() }; }
       if (res.status === 403 || res.status === 429) await this.diagnose(url, res);
       last = { status: res.status, server: res.headers?.get?.("server"), mitigated: res.headers?.get?.("cf-mitigated") };
       if (res.status === 404) return { status: 404, html: null };
@@ -93,7 +94,14 @@ export class PoliteFetcher {
       this.log.warn(`! ${url}: HTTP ${res.status}${last.server ? ` (server: ${last.server})` : ""}${last.mitigated ? ` cf-mitigated=${last.mitigated}` : ""}; retry ${attempt + 1}/${this.retryWaitsMs.length}`);
     }
     this.failed.push(`${url}: ${last?.err ? last.err : "HTTP " + last?.status}${last?.challenge ? " (JavaScript challenge page)" : ""}`);
-    if (last && (last.status === 403 || last.status === 429)) {
+    if (last?.challenge) {
+      // The challenge is served per uncached page, so the next page may well be fine;
+      // only a long run of them suggests the runner itself is being refused.
+      if (++this.consecutiveChallenges >= this.maxConsecutiveChallenges) {
+        this.blocked.add(cls);
+        this.failed.push(`${this.consecutiveChallenges} ${cls} pages challenged in a row; no more ${cls} fetches this run (cached pages still used)`);
+      }
+    } else if (last && (last.status === 403 || last.status === 429)) {
       this.blocked.add(cls);
       this.failed.push(`${cls} pages are being refused for this runner; no more ${cls} fetches this run (cached pages still used)`);
     }
