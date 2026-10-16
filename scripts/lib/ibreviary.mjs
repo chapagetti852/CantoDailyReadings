@@ -213,16 +213,17 @@ export class IBreviary {
   async page(iso, lang, oracle = null) {
     const key = `${iso}/${lang}`;
     if (this.mem.has(key)) return this.mem.get(key);
+    const sec = await this.sections(iso, lang);
+    if (!sec || !sec.picks.length) { this.failed.push(`${key}: proper pages not found in Reading menu`); this.mem.set(key, null); return null; }
+    if (lang === "en") await this.probeDate(iso, lang, sec.picks[0].href, oracle);
+    const q = this.dateQuery(iso);
     const path = join(this.cacheDir, lang, `${iso}.json`);
     let pages = null;
     if (existsSync(path)) {
       const obj = JSON.parse(readFileSync(path, "utf8"));
-      pages = obj.pages ?? null; // older entries held one html page; refetch
+      if (obj.pages && obj.dateQuery === q) pages = obj.pages; // entries fetched with another date format are stale
     }
     if (pages == null) {
-      const sec = await this.sections(iso, lang);
-      if (!sec || !sec.picks.length) { this.failed.push(`${key}: proper pages not found in Reading menu`); this.mem.set(key, null); return null; }
-      if (lang === "en") await this.probeDate(iso, lang, sec.picks[0].href, oracle);
       pages = [];
       for (const pick of sec.picks) {
         const sep = pick.href.includes("?") ? "&" : "?";
@@ -244,7 +245,7 @@ export class IBreviary {
       }
       this.fetched += pages.length;
       mkdirSync(join(this.cacheDir, lang), { recursive: true });
-      writeFileSync(path, JSON.stringify({ date: iso, lang, fetched: new Date().toISOString(), pages }));
+      writeFileSync(path, JSON.stringify({ date: iso, lang, dateQuery: q, fetched: new Date().toISOString(), pages }));
     }
     const parsed = parsePages(pages);
     const out = { url: pages[0]?.url, title: parsed.title, sets: groupSets(parsed.blocks.filter((b) => PROPER.has(b.kind) && b.lines.length)) };
