@@ -1,0 +1,54 @@
+name: Build and deploy
+
+on:
+  schedule:
+    - cron: "40 17 * * *"   # 01:40 Hong Kong time, daily
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      WINDOW_BACK: "3"
+      WINDOW_AHEAD: "14"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Cache World English Bible
+        uses: actions/cache@v4
+        with:
+          path: cache/web
+          key: web-vpl-v1
+      - name: Fetch World English Bible
+        run: scripts/fetch-web.sh
+      - name: Build site
+        run: npm run build -- --dump
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
