@@ -2,7 +2,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { parseDlcHtml, dlcUrl } from "../scripts/lib/dlc.mjs";
-import { parseVpl, lookup } from "../scripts/lib/web.mjs";
 
 test("dlc url", () => {
   assert.equal(dlcUrl("2026-02-06"), "http://catholic-dlc.org.hk/mt260206.htm");
@@ -25,19 +24,3 @@ for (const f of ["mt-sample.htm", "mt-sample-big5.htm"]) {
   });
 }
 
-test("vpl parsing and lookup with psalm offset", () => {
-  const web = parseVpl([
-    "PSA 18:30\tAs for God, his way is perfect.",
-    "PSA 18:46 Yahweh lives!",
-    "MRK 6:14\tKing Herod heard this. ¶",
-    "",
-  ].join("\n"));
-  assert.equal(web.size, 3);
-  const page = parseDlcHtml(new Uint8Array(readFileSync("test/fixtures/mt-sample.htm")));
-  const psalm = page.sections.find((s) => s.kind === "psalm");
-  const r = lookup(web, psalm.citation);
-  assert.deepEqual(r.verses.map((v) => v.ref), ["18:30", "18:46"]);
-  assert.deepEqual(r.missing, ["18:50", "18:51"]);
-  const gospel = lookup(web, page.sections.find((s) => s.kind === "gospel").citation);
-  assert.equal(gospel.verses[0].text, "King Herod heard this.");
-});

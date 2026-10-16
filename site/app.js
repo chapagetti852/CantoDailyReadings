@@ -45,7 +45,7 @@
       }
       if (s.en && s.en.verses.length) {
         const body = s.en.verses.map((v) => `<sup>${esc(v.ref.split(":")[1])}</sup>${esc(v.text)}`).join(" ");
-        html += `<p class="en">${body}<span class="src">World English Bible</span></p>`;
+        html += `<p class="en">${body}<span class="src">${esc(s.en.source === "NABRE" ? "New American Bible, Revised Edition" : s.en.source)}</span></p>`;
       }
     }
     main.innerHTML = html;

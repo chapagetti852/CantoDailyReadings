@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseCitation, toEnglish, expandVerses } from "../scripts/lib/citation.mjs";
+import { parseCitation, expandVerses } from "../scripts/lib/citation.mjs";
 import { bookFromText } from "../scripts/lib/books.mjs";
 
 test("book detection from full names and abbreviations", () => {
@@ -30,15 +30,3 @@ test("citation parsing", () => {
   assert.deepEqual(h.verses.map((x) => x.v), [1, 2, 3, 3, 4, 5, 6]);
 });
 
-test("versification: 思高 to English", () => {
-  assert.deepEqual(toEnglish("PSA", 51, 3), [{ book: "PSA", c: 51, v: 1 }]);
-  assert.deepEqual(toEnglish("PSA", 18, 31), [{ book: "PSA", c: 18, v: 30 }]);
-  assert.deepEqual(toEnglish("PSA", 23, 1), [{ book: "PSA", c: 23, v: 1 }]);
-  assert.deepEqual(toEnglish("MAL", 3, 19), [{ book: "MAL", c: 4, v: 1 }]);
-  assert.deepEqual(toEnglish("JOL", 3, 1), [{ book: "JOL", c: 2, v: 28 }]);
-  assert.deepEqual(toEnglish("JON", 2, 1), [{ book: "JON", c: 1, v: 17 }]);
-  assert.deepEqual(toEnglish("ISA", 8, 23), [{ book: "ISA", c: 9, v: 1 }]);
-  assert.deepEqual(toEnglish("MRK", 6, 14), [{ book: "MRK", c: 6, v: 14 }]);
-  assert.equal(toEnglish("DAN", 3, 52)[1].book, "S3Y");
-  assert.equal(toEnglish("DAN", 13, 1)[0].book, "SUS");
-});

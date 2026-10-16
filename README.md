@@ -2,7 +2,8 @@
 
 Personal, mobile-first web page showing the Hong Kong Diocese daily Mass readings
 and propers in Chinese, with **Yale Cantonese romanization as ruby text** over every
-character and the **World English Bible** text of the same scripture passages underneath.
+character and the **New American Bible, Revised Edition (NABRE)** text of the same
+scripture passages underneath.
 
 Everything is static and hosted on GitHub Pages. A scheduled GitHub Action rebuilds the
 site every night, so no server and no API keys are involved.
@@ -14,7 +15,7 @@ catholic-dlc.org.hk/mtYYMMDD.htm ──► scripts/lib/dlc.mjs   (fetch + parse 
                                           │
 overrides.json ──► to-jyutping ──► scripts/lib/yale.mjs   (Jyutping → Yale per character)
                                           │
-ebible.org WEB (public domain) ──► scripts/lib/web.mjs    (verses by 思高 citation, re-versified)
+bible.usccb.org/bible/<book>/<ch> ──► scripts/lib/nabre.mjs (NABRE verses by 思高 citation, cached)
                                           │
                                    dist/data/YYYY-MM-DD.json  +  site/  ──► GitHub Pages
 ```
@@ -29,9 +30,10 @@ ebible.org WEB (public domain) ──► scripts/lib/web.mjs    (verses by 思�
   word-aware Jyutping; a small converter turns it into Yale with diacritics (tone 1 = macron).
   Fix a mispronunciation by adding the word to `overrides.json`.
 - **English.** Guaranteed to match the Hong Kong day because it is driven by the citation on
-  the Chinese page, not by a foreign calendar. 思高 chapter/verse numbering is mapped to
-  English numbering (psalm superscriptions, Malachi 3:19 = 4:1, Joel 3 = 2:28, and so on) in
-  `scripts/lib/citation.mjs`. Prayers and antiphons without a citation are Chinese only.
+  the Chinese page, not by a foreign calendar. Verses come from the NABRE chapter pages on
+  the USCCB website, fetched once per chapter and kept in the Actions cache. NABRE and 思高
+  share the Hebrew chapter/verse numbering, so no re-versification is needed. Prayers and
+  antiphons without a citation are Chinese only.
 - **App.** `site/` is plain HTML/CSS/JS: date arrows and swipe, Yale and EN toggles, text
   size, dark mode, offline cache of visited days via a service worker, installable to the
   home screen.
@@ -53,24 +55,26 @@ layout (see `test/fixtures/mt-sample.htm`). If the first Action run reports
 `no sections recognised`, read the dumped text lines in the log and adjust `HEADERS` and
 `NOISE` in `scripts/lib/dlc.mjs`; the fixtures and tests show the intended output.
 
-If English is missing, check the "Fetch World English Bible" step: it tries
-`engwebc_vpl.zip`, then `engweb_vpl.zip`, from eBible.org.
+If English is missing, look for `! NABRE` lines at the end of the build log. A chapter page
+that was fetched but not understood is dumped there; adjust `MARKER_PATTERNS`,
+`contentRegion` or `stripNotes` in `scripts/lib/nabre.mjs` and add the page to
+`test/fixtures/` as a test. HTTP 403 would mean the site is blocking the runner.
 
 ## Local development
 
 ```sh
 npm install
-npm test                 # unit tests (parser, citations, versification, Yale)
-npm run build:fixture    # build dist/ from the sample page, no network needed
+npm test                 # unit tests (DLC parser, citations, NABRE parser, Yale)
+npm run build:fixture    # build dist/ from the sample page, no network, no English
 npx http-server dist     # or: python3 -m http.server --directory dist
 ```
 
 To build real dates locally: `node scripts/build.mjs --dates 2026-10-16,2026-10-17 --dump`.
-Run `scripts/fetch-web.sh` first if you want English text.
+Fetched NABRE chapters accumulate in `cache/nabre/` (git-ignored).
 
 ## Licences and sources
 
 - Readings and prayers © Hong Kong Diocesan Liturgy Commission / Studium Biblicum O.F.M.
   Fetched for personal use only; nothing is redistributed beyond the rolling window.
-- World English Bible: public domain (eBible.org).
+- NABRE © Confraternity of Christian Doctrine; fetched from bible.usccb.org for personal use only.
 - to-jyutping: BSD-2-Clause; rime-cantonese lexicon: CC BY 4.0.

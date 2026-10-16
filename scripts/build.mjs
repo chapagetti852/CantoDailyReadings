@@ -9,12 +9,13 @@
 //   node scripts/build.mjs --dates 2026-10-16,...  # specific dates
 //   node scripts/build.mjs --fixture file.htm      # parse a local file instead of fetching
 //   node scripts/build.mjs --dump                  # print extracted text lines for debugging
+//   node scripts/build.mjs --no-english            # skip NABRE fetching (offline tests)
 //   env WINDOW_BACK=3 WINDOW_AHEAD=14
 import { mkdirSync, writeFileSync, readFileSync, cpSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { fetchDlc, parseDlcHtml, dlcUrl } from "./lib/dlc.mjs";
 import { makeRomanizer } from "./lib/yale.mjs";
-import { loadWeb, lookup } from "./lib/web.mjs";
+import { Nabre } from "./lib/nabre.mjs";
 import { htmlToLines, decodeHtml } from "./lib/html.mjs";
 
 const args = process.argv.slice(2);
@@ -47,9 +48,7 @@ const dates = opt("--dates")
 
 const overrides = Object.fromEntries(Object.entries(existsSync("overrides.json") ? JSON.parse(readFileSync("overrides.json", "utf8")) : {}).filter(([k]) => !k.startsWith("_")));
 const romanize = makeRomanizer(overrides);
-const web = loadWeb();
-if (!web) console.warn("! No World English Bible found in cache/web — building without English text.");
-else console.log(`WEB loaded: ${web.size} verses`);
+const nabre = has("--no-english") ? null : new Nabre();
 
 const fixture = opt("--fixture");
 const built = [];
@@ -81,16 +80,17 @@ for (const date of dates) {
     continue;
   }
 
-  const sections = page.sections.map((s) => {
+  const sections = [];
+  for (const s of page.sections) {
     const lines = s.lines.map((l) => romanize(l));
     const out = { kind: s.kind, label: s.label, heading: s.heading, citation: s.citation?.text ?? null, lines };
-    if (web && s.citation) {
-      const { verses, missing } = lookup(web, s.citation);
-      if (verses.length) out.en = { source: "WEB", book: s.citation.book, verses };
+    if (nabre && s.citation) {
+      const { verses, missing } = await nabre.lookup(s.citation);
+      if (verses.length) out.en = { source: "NABRE", book: s.citation.book, verses };
       if (missing.length) out.enMissing = missing;
     }
-    return out;
-  });
+    sections.push(out);
+  }
 
   const day = {
     date,
@@ -112,6 +112,10 @@ cpSync("site", OUT, { recursive: true });
 writeFileSync(join(OUT, "robots.txt"), "User-agent: *\nDisallow: /\n");
 
 console.log(`\nBuilt ${built.length}/${dates.length} days into ${OUT}/`);
+if (nabre) {
+  console.log(`NABRE: ${nabre.fetched} chapter pages fetched this run, ${nabre.mem.size} chapters used`);
+  for (const f of nabre.failed) console.warn("! NABRE " + f);
+}
 for (const p of problems) console.warn("! " + p);
 if (!built.length && !fixture) {
   console.error("Nothing was built; failing so the previous deployment stays up.");
