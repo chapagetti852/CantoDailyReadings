@@ -55,7 +55,6 @@ button[aria-pressed="true"] .coin { border-color: var(--rubric); background: var
 .tools .opts[hidden] { display: none; }
 .optlab { font-family: var(--zh); font-size: 13px; color: var(--ink-3); letter-spacing: .1em; margin-right: 4px; }
 .chip { font-family: var(--ui); font-size: 13px; letter-spacing: .04em; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--rule); color: var(--ink-3); background: var(--paper); }
-.chip.la { font-family: var(--en); font-style: italic; font-size: 14px; }
 .chip[aria-pressed="true"] { color: var(--rubric); border-color: var(--rubric); background: var(--rubric-soft); }
 button.menu[aria-expanded="true"] .cap { color: var(--rubric); }
 .tools .sizes { gap: 18px; padding: 6px 0 10px; align-items: center; }

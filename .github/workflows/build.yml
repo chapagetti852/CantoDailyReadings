@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: "40 */3 * * *"  # every 3 hours; pages are cached, so most runs fetch little
   workflow_dispatch:
+    inputs:
+      dump:
+        description: "Dates (YYYY-MM-DD, comma-separated) to dump in full to the log"
+        required: false
+        default: ""
   push:
     branches: [main]
 
@@ -39,6 +44,8 @@ jobs:
             usccb-v1-
       - name: Build site
         run: npm run build -- --dump
+        env:
+          DUMP_DAYS: ${{ github.event.inputs.dump }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

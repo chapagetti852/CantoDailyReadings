@@ -57,6 +57,7 @@ const dates = opt("--dates")
 const overrides = Object.fromEntries(Object.entries(existsSync("overrides.json") ? JSON.parse(readFileSync("overrides.json", "utf8")) : {}).filter(([k]) => !k.startsWith("_")));
 const romanize = makeRomanizer(overrides);
 const english = !has("--no-english");
+const DUMP_DAYS = new Set((opt("--dump-days") ?? process.env.DUMP_DAYS ?? "").split(",").map((x) => x.trim()).filter(Boolean));
 const fetcher = new PoliteFetcher({ maxFetches: Number(process.env.MAX_FETCHES ?? 60) });
 const nabre = english ? new Nabre({ fetcher }) : null;
 const lect = english ? new Lectionary({ fetcher }) : null;
@@ -209,6 +210,24 @@ for (const date of dates) {
       if (s.en?.lines) for (const l of s.en.lines.slice(0, 40)) console.log("  en| " + l.slice(0, 110));
       if (s.en?.verses) for (const v of s.en.verses.slice(0, 3)) console.log("  en| " + v.ref + " " + v.text.slice(0, 100));
       if (s.la?.lines) for (const l of s.la.lines.slice(0, 6)) console.log("  la| " + l.slice(0, 110));
+    }
+  }
+  if (DUMP_DAYS.has(date)) {
+    // Full diagnostic dump of one day: raw DLC text, every parsed line, the raw US page text.
+    console.log(`\n===== raw ${date} ${url} [${page.charset}] =====`);
+    for (const l of htmlToLines(decodeHtml(bytes).text)) console.log("  | " + l);
+    console.log(`\n===== full ${date} titleLa="${titleLa}" =====`);
+    for (const s of sections) {
+      console.log(`--- ${s.kind} ${s.citation ?? ""}${s.en ? ` [en ${s.en.source} ${s.en.citation ?? ""}]` : ""}`);
+      for (const l of s.lines) console.log("  zh| " + (l.rubric ? "(rubric) " : "") + l.zh);
+      if (s.en?.lines) for (const l of s.en.lines) console.log("  en| " + l);
+      if (s.en?.verses) for (const v of s.en.verses) console.log("  en| " + v.ref + " " + v.text);
+      if (s.la?.lines) for (const l of s.la.lines) console.log("  la| " + l);
+    }
+    const usPath = join("cache/usccb", `${date}.json`);
+    if (existsSync(usPath)) {
+      console.log(`\n===== raw USCCB ${date} =====`);
+      for (const l of htmlToLines(JSON.parse(readFileSync(usPath, "utf8")).html ?? "")) console.log("  | " + l);
     }
   }
   built.push(date);
