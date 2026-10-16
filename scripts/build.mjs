@@ -16,6 +16,7 @@ import { join } from "node:path";
 import { fetchDlc, parseDlcHtml, CHAPTER_KINDS } from "./lib/dlc.mjs";
 import { Lectionary } from "./lib/lectionary.mjs";
 import { englishDayTitle, latinDayTitle } from "./lib/daytitle.mjs";
+import { latinFeastTitle, FEAST_LINE } from "./lib/sanctoral.mjs";
 import { IBreviary } from "./lib/ibreviary.mjs";
 import { PoliteFetcher } from "./lib/polite.mjs";
 import { makeRomanizer } from "./lib/yale.mjs";
@@ -171,18 +172,16 @@ for (const date of dates) {
   // not label a Hong Kong ferial day, and vice versa.
   let ferialEn = null;
   for (const t of page.title) { ferialEn = englishDayTitle(t); if (ferialEn) break; }
-  const hkFeast = page.title.some((t) => /（(紀念|自由紀念|慶日|節)）|節$/.test(t));
+  const hkFeast = page.title.some((t) => FEAST_LINE.test(t));
   let usTitle = english && firstGospelMatched ? await lect.title(date) : null;
   const usFeast = usTitle ? /memorial|feast|solemnity|saint|blessed/i.test(usTitle) : false;
   let titleEn = null;
   if (hkFeast) titleEn = usFeast ? usTitle : ferialEn;
   else titleEn = ferialEn ?? (usFeast ? null : usTitle);
-  let titleLa = null;
-  for (const t of page.title) { titleLa = latinDayTitle(t); if (titleLa) break; }
-  if (english && hkFeast) {
-    const fromBreviary = await ib.latinTitle(date);
-    if (fromBreviary) titleLa = fromBreviary;
-  }
+  // Latin day title: the celebration of the General Roman Calendar when the HK
+  // title names it (scripts/lib/sanctoral.mjs), else the ferial or Sunday title.
+  let titleLa = latinFeastTitle(date, page.title);
+  for (const t of page.title) { if (titleLa) break; titleLa = latinDayTitle(t); }
   // The acclamation has no citation on the HK page; when the Gospel of the same
   // day matches the US lectionary, its acclamation is used too.
   async function attachAlleluia() {

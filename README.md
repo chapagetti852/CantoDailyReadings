@@ -46,9 +46,12 @@ bible.usccb.org/bible/<book>/<ch> ──► scripts/lib/nabre.mjs (NABRE verses 
   (and, if present, communion antiphon) cites the same passage as the Hong Kong page,
   allowing for Vulgate psalm numbering, so a saint's day that differs between calendars
   gets no English rather than the wrong prayers. Latin is taken from the same formulary.
-  The day's name is always shown in Latin under the Chinese title: on memorials and
-  feasts from iBreviary's Latin Breviary page, otherwise a rendering of the Hong Kong
-  ferial or Sunday title in the Ordo's style (`scripts/lib/daytitle.mjs`).
+- **Latin day name.** Always shown under the Chinese title. Memorials, feasts and
+  solemnities come from a table of the General Roman Calendar (`scripts/lib/sanctoral.mjs`),
+  used only when the Hong Kong title of that date names the same saint; otherwise the
+  ferial, Sunday or octave title is rendered in the Ordo's style
+  (`scripts/lib/daytitle.mjs`). A saint missing from the table, or named differently
+  by the Diocese, simply shows the ferial title: add the Chinese keyword to the table.
 - **App.** `site/` is plain HTML/CSS/JS: date arrows and swipe; a 粵 toggle for Yale and
   讀 / 禱 drop-downs for the readings and the propers, each with 中文 (the group itself)
   plus English, and Latine for the propers; separate sliders for the Yale and the Chinese
