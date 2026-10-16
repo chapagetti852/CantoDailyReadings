@@ -99,3 +99,9 @@ test("a JavaScript challenge page is not retried and blocks only its class", asy
   assert.ok(f.blocked.has("chapter"), "four in a row does");
   assert.ok(!f.blocked.has("readings"));
 });
+
+test("scripture lines beginning with footer words do not end a reading", () => {
+  const html = `<html><body><h3>Reading 1</h3><div class="content-body"><p>Ephesians 2:1-10</p><p>You were dead in your transgressions<br>following the ruler of the power of the air,<br>Listen to him.<br>Share your bread.</p></div><h2>Responsorial Psalm</h2></body></html>`;
+  const [b] = parseReadingsHtml(html);
+  assert.deepEqual(b.lines, ["You were dead in your transgressions", "following the ruler of the power of the air,", "Listen to him.", "Share your bread."]);
+});

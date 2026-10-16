@@ -68,7 +68,10 @@ export function parseUsCitation(text) {
 }
 
 // Anything from here on is page furniture, not the reading.
-const STOP_RE = /^(?:Get Daily Readings|Sign up|Lectionary for Mass for Use|Copyright|©|Share|Listen|Audio|Video|Reflection|Daily Readings|Readings for|Donate|Back to|Print|Email|USCCB|Terms|Privacy|Follow|Subscribe)/i;
+// Footer and sidebar lines that end a reading block. Each phrase is anchored to a
+// whole line or a site phrase: a scripture line may begin with "Follow", "Listen"
+// or "Share" and must not end the reading.
+const STOP_RE = /^(?:Get Daily Readings|Sign up|Lectionary for Mass for Use|Copyright|©|Share(?: this)?$|Listen(?: podcast)?$|Audio$|Video$|View reflection|Reflection$|Daily Readings(?: Calendar)?$|Readings for the|Donate|Back to top|Print$|Email$|USCCB|Terms of Use|Privacy Policy|Follow us|Subscribe)/i;
 
 const KIND_OF_HEADING = [
   ["reading1", /reading\s*(?:1|i)\b|first reading/i],

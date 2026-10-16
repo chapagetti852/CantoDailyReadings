@@ -20,6 +20,20 @@ test("parse a NABRE chapter page", () => {
   assert.match(verses.get(16), /^But when Herod learned of it/);
   assert.ok(!verses.get(17).includes("This is the only mention"), "footnotes block stripped");
   assert.ok(!verses.get(17).includes("Copyright"), "footer stripped");
+  assert.ok(!verses.get(16).includes("Death of John"), "section heading not glued to the previous verse");
+});
+
+test("psalm strophe numerals and headings are dropped", () => {
+  const html = `<body><div class="content-body"><p class="s1">Zion, the Royal City of God</p><p><span class="bcv">1</span> A psalm.</p><p>I</p><p><span class="bcv">2</span> Sing a new song.</p><p>II</p><p class="s1">The Lord's Day</p><p><span class="bcv">3</span> Shout with joy.</p></div></body>`;
+  const { verses } = parseChapterHtml(html);
+  assert.deepEqual([...verses.entries()], [[1, "A psalm."], [2, "Sing a new song."], [3, "Shout with joy."]]);
+});
+
+test("a verse cited twice is returned once", async () => {
+  const n = new Nabre({ cacheDir: "cache/nabre-test-dup" });
+  n.mem.set("PSA 98", new Map([[1, "one"], [2, "two"], [3, "three"], [4, "four"]]));
+  const { verses } = await n.lookup({ book: "PSA", verses: [{ c: 98, v: 1 }, { c: 98, v: 2 }, { c: 98, v: 3 }, { c: 98, v: 3 }, { c: 98, v: 4 }] });
+  assert.deepEqual(verses.map((v) => v.ref), ["98:1", "98:2", "98:3", "98:4"]);
 });
 
 test("parser falls back to plain <sup> verse numbers", () => {

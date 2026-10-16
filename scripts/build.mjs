@@ -124,7 +124,11 @@ for (const date of dates) {
   let gospelMatched = false;
   let firstGospelMatched = false;
   let setStart = 0;
-  const kept = page.sections;
+  // Pages with several formularies (Mission Sunday, solemnities with a vigil Mass)
+  // would triple the text: keep the first set the Diocese gives and note the rest.
+  const firstDivider = page.sections.findIndex((s) => s.kind === "divider");
+  const kept = firstDivider > 0 ? page.sections.slice(0, firstDivider) : page.sections;
+  if (firstDivider > 0) console.log(`${date}: ${page.sections.filter((s) => s.kind === "divider").length} alternative formulary set(s) omitted`);
   for (const s of kept) {
     const lines = (s.kind === "divider" && s.heading ? [s.heading, ...s.lines] : s.lines).map((l) => romanize(l));
     const out = { kind: s.kind, label: s.label, heading: s.heading, citation: s.citation?.text ?? null, lines };
@@ -138,6 +142,8 @@ for (const date of dates) {
       } else {
         // 2. Otherwise the NABRE chapter text for the cited verses.
         const { verses, missing } = await nabre.lookup(s.citation);
+        // A passage starting mid-sentence ("for, if you confess...") reads as a reading.
+        if (verses.length && /^[a-z]/.test(verses[0].text)) verses[0] = { ...verses[0], text: verses[0].text[0].toUpperCase() + verses[0].text.slice(1) };
         if (verses.length) out.en = { source: "NABRE", book: s.citation.book, verses };
         if (missing.length) out.enMissing = missing;
       }

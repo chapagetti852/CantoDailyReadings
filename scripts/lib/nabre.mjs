@@ -67,6 +67,9 @@ function contentRegion(html) {
 function stripNotes(html) {
   return html
     .replace(/<(script|style|noscript|nav|header|footer|aside|form)\b[\s\S]*?<\/\1>/gi, "")
+    // section headings ("The Death of John the Baptist.") and chapter headings
+    .replace(/<p\b[^>]*class="[^"]*\bs\d\b[^"]*"[^>]*>[\s\S]*?<\/p>/gi, "")
+    .replace(/<h[1-6]\b[^>]*>[\s\S]*?<\/h[1-6]>/gi, "")
     // footnote / cross-reference markers: links or superscripts whose content is a letter or symbol
     .replace(/<a\b[^>]*>\s*(?:[a-z]|\*|†|‡|\[[^\]]{1,6}\])\s*<\/a>/gi, "")
     .replace(/<sup\b[^>]*>\s*(?:[a-z]{1,2}|\*|†|‡)\s*<\/sup>/gi, "")
@@ -99,6 +102,8 @@ export function parseChapterHtml(html) {
     let body = p.slice(k + 1);
     // Cut trailing footnote blocks that may follow the last verse.
     body = body.split(/\n(?=\*\s*\[|\[\d+:\d+|Footnotes|Cross-?references|Chapter \d+|Next Chapter|Previous Chapter)/i)[0];
+    // Psalm strophe numerals and headings stand on their own line.
+    body = body.split("\n").filter((l) => !/^\s*[IVX]{1,5}\s*$/.test(l)).join("\n");
     body = decodeEntities(body).replace(/\s+/g, " ").replace(/\s+([,.;:!?”’)])/g, "$1").trim();
     if (!Number.isNaN(n) && body && !verses.has(n)) verses.set(n, body);
   }
@@ -162,9 +167,12 @@ export class Nabre {
   async lookup(cit) {
     const verses = [];
     const missing = [];
+    const seen = new Set();
     let stopped = false;
     for (const { c, v, openEnd } of expandVerses(cit)) {
       if (openEnd && stopped) continue;
+      if (seen.has(`${c}:${v}`)) continue; // "2-3, 3-4" cites verse 3 twice
+      seen.add(`${c}:${v}`);
       const ch = await this.chapter(cit.book, c);
       const t = ch?.get(v);
       if (t) verses.push({ ref: `${c}:${v}`, text: t });

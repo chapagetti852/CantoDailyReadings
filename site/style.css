@@ -99,7 +99,6 @@ body.noruby p.zh { line-height: 1.95; }
 .en, .la { font-family: var(--en); font-size: 1.05rem; line-height: 1.5; color: var(--ink); margin: 1.1rem 0 1rem; padding-left: 1rem; border-left: 1px solid var(--rule); }
 .en + .la { margin-top: .6rem; }
 .la { font-style: italic; }
-.en sup { font-size: .6em; color: var(--rubric); margin-right: .15em; font-family: var(--ui); font-style: normal; }
 .en b { font-weight: 600; }
 .en .r { font-family: var(--ui); font-size: .7em; letter-spacing: .08em; color: var(--rubric); vertical-align: .1em; font-weight: 600; }
 .en .alt, .la .alt { color: var(--ink-3); font-size: .85em; font-style: italic; }

@@ -67,7 +67,8 @@
     if (!s.en) return "";
     let body;
     if (s.en.verses) {
-      body = s.en.verses.map((v) => `<sup>${esc(v.ref.split(":")[1])}</sup>${esc(v.text)}`).join(" ");
+      const ls = s.en.verses.map((v) => esc(v.text));
+      body = s.kind === "psalm" ? ls.join("<br>") : ls.join(" ");
     } else {
       const keepLines = s.kind === "psalm" || s.kind === "alleluia" || s.kind === "sequence";
       const ls = s.en.lines.map((l) => (/^R\.|^R:/.test(l) ? `<b><span class="r">R.</span> ${esc(l.replace(/^R\.?\s*(\([^)]*\))?\s*/, ""))}</b>` : /^(Or|Vel)\b/.test(l) ? `<i class="alt">${esc(l)}</i>` : esc(l)));

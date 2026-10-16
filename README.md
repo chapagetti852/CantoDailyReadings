@@ -26,7 +26,8 @@ bible.usccb.org/bible/<book>/<ch> ──► scripts/lib/nabre.mjs (NABRE verses 
 - **Chinese source.** The Diocesan Liturgy Commission's daily page, one per date.
   Readings (讀經一, 答唱詠, 讀經二, 繼抒詠, 福音前歡呼, 福音) always show; the propers
   (進堂詠, 集禱經, 獻禮經, 領主詠, 領聖體後經) sit behind the 禱文 toggle, off by default.
-  Days with alternative formularies get a divider per set.
+  When a page offers several formularies (Mission Sunday, a solemnity with a vigil
+  Mass), only the first set is built; the log says how many were omitted.
 - **Romanization.** `to-jyutping` (BSD-2, built on the CC-BY rime-cantonese lexicon) gives
   word-aware Jyutping; a small converter turns it into Yale with diacritics (tone 1 = macron).
   Fix a mispronunciation by adding the word to `overrides.json`.
