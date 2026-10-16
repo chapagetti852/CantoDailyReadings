@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, rmSync } from "node:fs";
-import { parseMissalHtml, groupSets, antiphonMatches, IBreviary } from "../scripts/lib/ibreviary.mjs";
+import { parseMissalHtml, parsePages, groupSets, antiphonMatches, IBreviary } from "../scripts/lib/ibreviary.mjs";
 import { parseCitation } from "../scripts/lib/citation.mjs";
 import { PoliteFetcher } from "../scripts/lib/polite.mjs";
 
@@ -50,4 +50,15 @@ test("match a HK set and fetch Latin for the same formulary", async () => {
   const none = await ib.match("2026-10-16", { entrance: parseCitation("詠70:2"), communion: null });
   assert.equal(none.en, null);
   rmSync(dir, { recursive: true, force: true });
+});
+
+test("a bare Antiphon heading takes the kind of its page", () => {
+  const pages = [
+    { antiphonKind: "entrance", lines: ["Antiphon", "Cf. Mt 4: 18-19", "Beside the Sea of Galilee,", "The Gloria in excelsis (Glory to God in the highest) is said.", "Collect", "We humbly implore your majesty, O Lord,"] },
+    { antiphonKind: null, lines: ["Prayer over the Offerings", "Accept, O Lord, the prayers of your faithful"] },
+    { antiphonKind: "communion", lines: ["Antiphon", "Cf. Ps 34 (33):11", "The rich suffer want and go hungry,", "Prayer after Communion", "We entreat your majesty most humbly, O Lord,"] },
+  ];
+  const { blocks } = parsePages(pages);
+  assert.deepEqual(blocks.map((b) => [b.kind, b.citation]), [["entrance", "Mt 4: 18-19"], ["collect", null], ["offertory", null], ["communion", "Ps 34 (33):11"], ["postcommunion", null]]);
+  assert.ok(!blocks[0].lines.some((l) => /is said/.test(l)), "rubric dropped");
 });

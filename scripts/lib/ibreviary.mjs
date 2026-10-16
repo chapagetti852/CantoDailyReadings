@@ -11,8 +11,14 @@ import { PoliteFetcher } from "./polite.mjs";
 import { parseUsCitation } from "./lectionary.mjs";
 
 export const BASE = "https://www.ibreviary.com/m2/";
-const DATE_PARAMS = ["date", "data", "giorno"];
-const DATE_FORMATS = [(y, m, d) => `${y}${m}${d}`, (y, m, d) => `${y}-${m}-${d}`, (y, m, d) => `${d}/${m}/${y}`];
+// Candidate ways of asking for a date; the right one is found by probing with the
+// Hong Kong entrance antiphon citation as the oracle and remembered in the cache.
+const DATE_CANDIDATES = [
+  ["date", (y, m, d) => `${y}${m}${d}`], ["date", (y, m, d) => `${y}-${m}-${d}`], ["date", (y, m, d) => `${d}/${m}/${y}`],
+  ["date", (y, m, d) => `${d}-${m}-${y}`], ["date", (y, m, d) => `${m}/${d}/${y}`], ["date", (y, m, d) => `${y}/${m}/${d}`],
+  ["date", (y, m, d) => `${d}.${m}.${y}`], ["data", (y, m, d) => `${y}${m}${d}`], ["data", (y, m, d) => `${d}/${m}/${y}`],
+  ["giorno", (y, m, d) => `${y}-${m}-${d}`], ["d", (y, m, d) => `${y}${m}${d}`], ["day", (y, m, d) => `${y}-${m}-${d}`],
+];
 
 export const KIND_OF_HEADING = [
   ["entrance", /^(entrance antiphon|antiphona ad introitum|ad introitum|introit|antifona d'ingresso)/i],
@@ -32,7 +38,7 @@ export const KIND_OF_HEADING = [
 const PROPER = new Set(["entrance", "collect", "offertory", "preface", "communion", "postcommunion", "over_people"]);
 const REQUIRED = new Set(["entrance", "collect", "communion", "postcommunion"]);
 const KIND_RE = new RegExp(KIND_OF_HEADING.map(([, re]) => `(?:${re.source})`).join("|"), "i");
-const NOISE = /^(today|oggi|home|menu|back|indietro|options|opzioni|calendar|calendario|share|condividi|www\.|©|copyright|ibreviary|font|print|stampa|settings)/i;
+const NOISE = /^(today|oggi|home|-?\s*menu\s*-?$|back|indietro|options|opzioni|calendar|calendario|share|condividi|www\.|©|copyright|ibreviary|font|print|stampa|settings)/i;
 const CITE_LINE = /^(?:cf\.?\s*)?(?:[1-3]\s?)?[A-Z][a-z]{0,4}\.?\s*\d+\s*(?:\(\d+\))?\s*[:,]\s*\d/i;
 
 function ymd(iso) { const [y, m, d] = iso.split("-"); return [y, m, d]; }
@@ -40,13 +46,29 @@ function ymd(iso) { const [y, m, d] = iso.split("-"); return [y, m, d]; }
 /** Group a flat list of heading/text lines into Missal blocks. */
 export function parseMissalHtml(html) { return parseMissalLines(htmlToLines(html).filter((l) => !NOISE.test(l))); }
 
-export function parseMissalLines(lines) {
+/** Parse the proper sub-pages in order; a bare "Antiphon" heading takes the page's kind. */
+export function parsePages(pages) {
+  const title = [];
+  const blocks = [];
+  for (const p of pages) {
+    const r = parseMissalLines(p.lines, p.antiphonKind);
+    title.push(...r.title);
+    blocks.push(...r.blocks);
+  }
+  return { title, blocks };
+}
+
+const RUBRIC_LINE = /\bis (said|sung|omitted)\.?$|^(or|or:|vel|oppure)$/i;
+
+export function parseMissalLines(lines, antiphonKind = "entrance") {
   const blocks = [];
   const title = [];
   let cur = null;
   for (const raw of lines) {
     const line = raw.replace(/\s+/g, " ").trim();
-    const km = KIND_OF_HEADING.find(([, re]) => re.test(line) && line.length < 60);
+    if (RUBRIC_LINE.test(line)) continue;
+    let km = KIND_OF_HEADING.find(([, re]) => re.test(line) && line.length < 60);
+    if (!km && /^(antiphon|antiphona|antifona)$/i.test(line) && antiphonKind) km = [antiphonKind];
     if (km) { cur = { kind: km[0], heading: line, citation: null, lines: [] }; blocks.push(cur); continue; }
     if (!cur) { if (line.length <= 90) title.push(line); continue; }
     // Citation: on its own line ("Ps 130 (129):3-4", "Cf. Mt 25:34") or trailing in parentheses.
@@ -96,14 +118,47 @@ export class IBreviary {
     this.cacheDir = cacheDir; this.log = log;
     this.fetcher = fetcher ?? new PoliteFetcher({ delayMs: 2500, log });
     this.mem = new Map(); this.fetched = 0; this.failed = []; this.dumped = false;
-    this.discovery = { dateParam: process.env.IB_DATE_PARAM, dateFormat: process.env.IB_DATE_FORMAT ? Number(process.env.IB_DATE_FORMAT) : undefined };
+    this.dateCandidate = null;
+    this.loadFormat();
   }
 
-  dateQuery(iso) {
+  dateQuery(iso, candidate = this.dateCandidate) {
     const [y, m, d] = ymd(iso);
-    const p = this.discovery.dateParam ?? DATE_PARAMS[0];
-    const f = DATE_FORMATS[this.discovery.dateFormat ?? 0];
+    const [p, f] = candidate ?? DATE_CANDIDATES[0];
     return `${p}=${encodeURIComponent(f(y, m, d))}`;
+  }
+
+  loadFormat() {
+    try { const i = JSON.parse(readFileSync(join(this.cacheDir, "format.json"), "utf8")).index; if (Number.isInteger(i) && DATE_CANDIDATES[i]) this.dateCandidate = DATE_CANDIDATES[i]; } catch {}
+    if (process.env.IB_DATE_INDEX) this.dateCandidate = DATE_CANDIDATES[Number(process.env.IB_DATE_INDEX)];
+  }
+
+  /**
+   * Find which date parameter the site honours: fetch the entrance page of one
+   * day in each candidate format and keep the first whose antiphon citation
+   * matches the Hong Kong one. Logged so the format can be fixed by hand too.
+   */
+  async probeDate(iso, lang, href, hkEntrance) {
+    if (this.dateCandidate || !hkEntrance) return;
+    this.log.log(`iBreviary: probing date formats on ${href} for ${iso} (expecting ${hkEntrance.text})`);
+    for (let i = 0; i < DATE_CANDIDATES.length; i++) {
+      const sep = href.includes("?") ? "&" : "?";
+      const url = `${BASE}${href}${sep}lang=${lang}&${this.dateQuery(iso, DATE_CANDIDATES[i])}`;
+      const r = await this.fetcher.get(url);
+      if (!r.html) { this.log.log(`  ${url}: not fetched`); continue; }
+      const lines = htmlToLines(r.html).filter((l) => !NOISE.test(l));
+      const cite = lines.find((l) => CITE_LINE.test(l) && l.length < 40) ?? "";
+      const ok = antiphonMatches(hkEntrance, cleanCite(cite));
+      this.log.log(`  ${url}: first citation "${cite}" -> ${ok ? "MATCH" : "no"}`);
+      if (ok) {
+        this.dateCandidate = DATE_CANDIDATES[i];
+        mkdirSync(this.cacheDir, { recursive: true });
+        writeFileSync(join(this.cacheDir, "format.json"), JSON.stringify({ index: i, param: DATE_CANDIDATES[i][0], example: this.dateQuery(iso) }));
+        return;
+      }
+    }
+    this.failed.push("no date format produced the expected antiphon; the site may need a session cookie for dates");
+    this.dateCandidate = DATE_CANDIDATES[0];
   }
 
   /** Links on a page: [{href, text}] with the site prefix removed. */
@@ -155,7 +210,7 @@ export class IBreviary {
     for (const l of lines.slice(0, 60)) this.log.log("  | " + l);
   }
 
-  async page(iso, lang) {
+  async page(iso, lang, oracle = null) {
     const key = `${iso}/${lang}`;
     if (this.mem.has(key)) return this.mem.get(key);
     const path = join(this.cacheDir, lang, `${iso}.json`);
@@ -167,6 +222,7 @@ export class IBreviary {
     if (pages == null) {
       const sec = await this.sections(iso, lang);
       if (!sec || !sec.picks.length) { this.failed.push(`${key}: proper pages not found in Reading menu`); this.mem.set(key, null); return null; }
+      if (lang === "en") await this.probeDate(iso, lang, sec.picks[0].href, oracle);
       pages = [];
       for (const pick of sec.picks) {
         const sep = pick.href.includes("?") ? "&" : "?";
@@ -174,11 +230,13 @@ export class IBreviary {
         const r = await this.fetcher.get(url);
         if (!r.html) { this.failed.push(`${key}: ${pick.text} not fetched`); continue; }
         const lines = IBreviary.stripMenu(htmlToLines(r.html).filter((l) => !NOISE.test(l)), sec.menuTexts);
+        if (lang === "la" && !this.laDumped) { this.laDumped = true; this.log.log(`iBreviary Latin sample (${url}):`); for (const l of lines.slice(0, 12)) this.log.log("  | " + l); }
         this.dumpOnce(url, lines, "first proper page");
-        pages.push({ url, text: pick.text, lines });
+        const antiphonKind = /offer|oblat/i.test(pick.text + pick.href) ? null : /commun|comuni/i.test(pick.text + pick.href) ? "communion" : "entrance";
+        pages.push({ url, text: pick.text, lines, antiphonKind });
       }
       if (!pages.length) { this.mem.set(key, null); return null; }
-      const parsed = parseMissalLines(pages.flatMap((p) => p.lines));
+      const parsed = parsePages(pages);
       if (!IBreviary.usable(parsed)) {
         this.failed.push(`${key}: no antiphon/collect recognised in ${pages.map((p) => p.url).join(", ")}`);
         this.mem.set(key, null);
@@ -188,7 +246,7 @@ export class IBreviary {
       mkdirSync(join(this.cacheDir, lang), { recursive: true });
       writeFileSync(path, JSON.stringify({ date: iso, lang, fetched: new Date().toISOString(), pages }));
     }
-    const parsed = parseMissalLines(pages.flatMap((p) => p.lines));
+    const parsed = parsePages(pages);
     const out = { url: pages[0]?.url, title: parsed.title, sets: groupSets(parsed.blocks.filter((b) => PROPER.has(b.kind) && b.lines.length)) };
     this.mem.set(key, out);
     return out;
@@ -201,7 +259,7 @@ export class IBreviary {
    * @returns {Promise<{en: object[]|null, la: object[]|null, title: string|null}>}
    */
   async match(iso, { entrance, communion }) {
-    const en = await this.page(iso, "en");
+    const en = await this.page(iso, "en", entrance ?? communion);
     if (!en) return { en: null, la: null, title: null };
     const score = (set) => {
       const e = set.find((b) => b.kind === "entrance"), c = set.find((b) => b.kind === "communion");
