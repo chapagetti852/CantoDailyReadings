@@ -16,6 +16,7 @@ import { join } from "node:path";
 import { fetchDlc, parseDlcHtml, CHAPTER_KINDS } from "./lib/dlc.mjs";
 import { Lectionary } from "./lib/lectionary.mjs";
 import { englishDayTitle } from "./lib/daytitle.mjs";
+import { IBreviary } from "./lib/ibreviary.mjs";
 import { PoliteFetcher } from "./lib/polite.mjs";
 import { makeRomanizer } from "./lib/yale.mjs";
 import { Nabre } from "./lib/nabre.mjs";
@@ -58,6 +59,8 @@ const english = !has("--no-english");
 const fetcher = new PoliteFetcher({ maxFetches: Number(process.env.MAX_FETCHES ?? 60) });
 const nabre = english ? new Nabre({ fetcher }) : null;
 const lect = english ? new Lectionary({ fetcher }) : null;
+const ib = english ? new IBreviary({ fetcher: new PoliteFetcher({ delayMs: 2500, maxFetches: Number(process.env.MAX_FETCHES ?? 60) }) }) : null;
+const PROPER_KINDS = new Set(["entrance", "collect", "offertory", "preface", "communion", "postcommunion", "blessing"]);
 
 const fixture = opt("--fixture");
 
@@ -119,13 +122,11 @@ for (const date of dates) {
   let gospelMatched = false;
   let firstGospelMatched = false;
   let setStart = 0;
-  // Readings only: prayers and antiphons are not shown, so drop them before
-  // English lookup; a divider survives only if readings follow it.
-  const READING_KINDS = new Set(["reading1", "psalm", "reading2", "sequence", "alleluia", "gospel", "divider"]);
-  const kept = page.sections.filter((s) => READING_KINDS.has(s.kind));
+  const kept = page.sections;
   for (const s of kept) {
     const lines = (s.kind === "divider" && s.heading ? [s.heading, ...s.lines] : s.lines).map((l) => romanize(l));
     const out = { kind: s.kind, label: s.label, heading: s.heading, citation: s.citation?.text ?? null, lines };
+    if (PROPER_KINDS.has(s.kind)) out.proper = true;
     if (english && CHAPTER_KINDS.has(s.kind) && s.citation) {
       // 1. Exact lectionary wording from the USCCB daily readings page when the same passage is read there.
       const m = await lect.match(date, s.citation, { kind: s.kind });
@@ -139,13 +140,31 @@ for (const date of dates) {
         if (missing.length) out.enMissing = missing;
       }
     }
-    if (s.kind === "divider") { await attachAlleluia(); gospelMatched = false; setStart = sections.length + 1; }
+    if (s.kind === "divider") { await attachAlleluia(); await attachPropers(); gospelMatched = false; setStart = sections.length + 1; }
     sections.push(out);
   }
   await attachAlleluia();
-  // Drop dividers that no readings follow (e.g. an optional memorial that only has prayers).
+  await attachPropers();
+  // Drop dividers that nothing follows.
   for (let i = sections.length - 1; i >= 0; i--) {
     if (sections[i].kind === "divider" && (i === sections.length - 1 || sections[i + 1].kind === "divider")) sections.splice(i, 1);
+  }
+  // Missal propers in English and Latin from iBreviary, matched by the antiphon citations of this set.
+  async function attachPropers() {
+    if (!english) return;
+    const set = sections.slice(setStart);
+    const srcOf = (kind) => kept.slice(setStart).find((x) => x.kind === kind);
+    const entrance = srcOf("entrance")?.citation, communion = srcOf("communion")?.citation;
+    if (!entrance && !communion) return;
+    const m = await ib.match(date, { entrance, communion });
+    if (!m.en) return;
+    for (const sec of set) {
+      if (!sec.proper) continue;
+      const enB = m.en.find((b) => b.kind === sec.kind);
+      const laB = m.la?.find((b) => b.kind === sec.kind);
+      if (enB) sec.en = { source: "iBreviary", citation: enB.citation, lines: enB.lines };
+      if (laB) sec.la = { source: "iBreviary", citation: laB.citation, lines: laB.lines };
+    }
   }
   // English day title: the USCCB page's when it is the same day, else a translation of the HK ferial title.
   let titleEn = null;
@@ -176,10 +195,11 @@ for (const date of dates) {
       for (const l of s.lines.slice(0, 6)) console.log("  zh| " + l.zh.slice(0, 90));
       if (s.en?.lines) for (const l of s.en.lines.slice(0, 40)) console.log("  en| " + l.slice(0, 110));
       if (s.en?.verses) for (const v of s.en.verses.slice(0, 3)) console.log("  en| " + v.ref + " " + v.text.slice(0, 100));
+      if (s.la?.lines) for (const l of s.la.lines.slice(0, 6)) console.log("  la| " + l.slice(0, 110));
     }
   }
   built.push(date);
-  const kinds = sections.map((s) => s.kind + (s.en ? (s.en.source === "Lectionary" ? "+lect" : "+nabre") : "")).join(" ");
+  const kinds = sections.map((s) => s.kind + (s.en ? (s.en.source === "Lectionary" ? "+lect" : s.en.source === "iBreviary" ? "+ib" : "+nabre") : "") + (s.la ? "+la" : "")).join(" ");
   console.log(`${date}: ${sections.length} sections [${kinds}] title="${page.title.join(" / ")}"${titleEn ? ` en="${titleEn}"` : ""}`);
 }
 
@@ -195,6 +215,9 @@ if (english) {
   for (const f of fetcher.failed) console.warn("! fetch " + f);
   for (const f of lect.failed) console.warn("! Lectionary " + f);
   for (const f of nabre.failed) console.warn("! NABRE " + f);
+  console.log(`iBreviary: ${ib.fetcher.count} requests, ${ib.fetched} Missal pages fetched`);
+  for (const f of ib.fetcher.failed) console.warn("! iBreviary fetch " + f);
+  for (const f of ib.failed) console.warn("! iBreviary " + f);
 }
 for (const p of problems) console.warn("! " + p);
 if (!built.length && !fixture) {

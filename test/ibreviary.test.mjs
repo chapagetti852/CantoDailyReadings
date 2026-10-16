@@ -1,0 +1,51 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync, rmSync } from "node:fs";
+import { parseMissalHtml, groupSets, antiphonMatches, IBreviary } from "../scripts/lib/ibreviary.mjs";
+import { parseCitation } from "../scripts/lib/citation.mjs";
+import { PoliteFetcher } from "../scripts/lib/polite.mjs";
+
+test("parse an iBreviary Missal page", () => {
+  const { title, blocks } = parseMissalHtml(readFileSync("test/fixtures/ibreviary-en.html", "utf8"));
+  assert.equal(title[0], "Friday of the Twenty-eighth Week in Ordinary Time");
+  assert.deepEqual(blocks.map((b) => b.kind), ["entrance", "collect", "offertory", "communion", "postcommunion"]);
+  assert.equal(blocks[0].citation, "Ps 130 (129):3-4");
+  assert.equal(blocks[0].lines[0], "If you, O Lord, should mark iniquities,");
+  assert.equal(blocks[3].citation, "Ps 34 (33):11");
+  assert.match(blocks[1].lines.at(-1), /for ever and ever\.$/);
+  assert.ok(!blocks.at(-1).lines.some((l) => /iBreviary/.test(l)));
+  assert.equal(groupSets(blocks).length, 1);
+});
+
+test("antiphon citation matching across numbering systems", () => {
+  assert.ok(antiphonMatches(parseCitation("詠130:3-4"), "Ps 130 (129):3-4"));
+  assert.ok(antiphonMatches(parseCitation("詠130:3-4"), "Ps 129, 3-4"), "Vulgate numbering");
+  assert.ok(antiphonMatches(parseCitation("詠34:11"), "Cf. Ps 34 (33):11"));
+  assert.ok(antiphonMatches(parseCitation("若一3:2"), "1 Jn 3:2"));
+  assert.ok(!antiphonMatches(parseCitation("詠130:3-4"), "Ps 34 (33):11"));
+  assert.ok(!antiphonMatches(parseCitation("詠70:2"), "Mt 25:34"));
+});
+
+test("match a HK set and fetch Latin for the same formulary", async () => {
+  const dir = "cache/ibreviary-test";
+  rmSync(dir, { recursive: true, force: true });
+  const en = readFileSync("test/fixtures/ibreviary-en.html", "utf8");
+  const la = en.replace("ENTRANCE ANTIPHON", "Antiphona ad introitum").replace("Ps 130 (129):3-4", "Ps 129, 3-4").replace("COLLECT", "Collecta").replace("PRAYER OVER THE OFFERINGS", "Super oblata").replace("COMMUNION ANTIPHON", "Antiphona ad communionem").replace("PRAYER AFTER COMMUNION", "Post communionem").replace("May your grace, O Lord, we pray,", "Tua nos, quaesumus, Domine, gratia semper et praeveniat et sequatur,");
+  const urls = [];
+  const fetcher = new PoliteFetcher({ delayMs: 0, fetchImpl: async (url) => {
+    urls.push(url);
+    const index = !/[?&]s=/.test(url);
+    const body = index ? `<a href="messale.php?s=antifone_e_orazioni&lang=en">Antiphons and Prayers</a>` : (/lang=la/.test(url) ? la : en);
+    return { ok: true, status: 200, text: async () => body, headers: new Map() };
+  } });
+  const ib = new IBreviary({ cacheDir: dir, fetcher, log: { log() {}, warn() {} } });
+  const m = await ib.match("2026-10-16", { entrance: parseCitation("詠130:3-4"), communion: parseCitation("詠34:11") });
+  assert.ok(m.en, "matched");
+  assert.equal(m.en.find((b) => b.kind === "collect").lines[0], "May your grace, O Lord, we pray,");
+  assert.equal(m.la.find((b) => b.kind === "collect").lines[0], "Tua nos, quaesumus, Domine, gratia semper et praeveniat et sequatur,");
+  assert.ok(urls[0].includes("messale.php?lang=en"), "index discovered first");
+  assert.ok(urls[1].includes("s=antifone_e_orazioni"), "discovered slug used");
+  const none = await ib.match("2026-10-16", { entrance: parseCitation("詠70:2"), communion: null });
+  assert.equal(none.en, null);
+  rmSync(dir, { recursive: true, force: true });
+});

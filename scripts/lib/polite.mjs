@@ -58,7 +58,10 @@ export class PoliteFetcher {
   }
 
   /** Pages are blocked per class: a challenge on chapter pages must not stop the readings pages. */
-  static classOf(url) { return url.includes("/bible/readings/") ? "readings" : "chapter"; }
+  static classOf(url) {
+    if (url.includes("ibreviary")) return "ibreviary";
+    return url.includes("/bible/readings/") ? "readings" : "chapter";
+  }
 
   /** @returns {Promise<{status:number, html:string|null}>} status 0 = not attempted */
   async get(url) {

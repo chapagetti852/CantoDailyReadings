@@ -5,7 +5,7 @@
   const HK_OFFSET = 8 * 3600e3;
   const WEEKDAY = ["日", "一", "二", "三", "四", "五", "六"];
 
-  let settings = { ruby: true, en: true, size: 18 };
+  let settings = { ruby: true, en: true, la: false, propers: false, size: 19 };
   try { Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}")); } catch {}
   const saveSettings = () => { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {} };
 
@@ -17,9 +17,13 @@
   function applySettings() {
     document.body.classList.toggle("noruby", !settings.ruby);
     document.body.classList.toggle("noen", !settings.en);
+    document.body.classList.toggle("nola", !settings.la);
+    document.body.classList.toggle("noprop", !settings.propers);
     document.documentElement.style.setProperty("--base", settings.size + "px");
     $("tRuby").setAttribute("aria-pressed", String(settings.ruby));
     $("tEn").setAttribute("aria-pressed", String(settings.en));
+    $("tLa").setAttribute("aria-pressed", String(settings.la));
+    $("tProp").setAttribute("aria-pressed", String(settings.propers));
   }
 
   function rubyHtml(line) {
@@ -58,6 +62,13 @@
     return `<p class="en" lang="en" translate="yes">${body}</p>`;
   }
 
+  function laHtml(s) {
+    if (!s.la) return "";
+    const ls = s.la.lines.map((l) => esc(l));
+    const keep = s.kind === "entrance" || s.kind === "communion";
+    return `<p class="la" lang="la" translate="yes">${keep ? ls.join("<br>") : ls.join(" ")}</p>`;
+  }
+
   function render(day) {
     let html = "";
     const [first, ...rest] = day.title;
@@ -75,12 +86,12 @@
         html += `<details class="note"><summary>${esc(s.label)}</summary>${s.lines.map((l) => `<p class="zh">${lineHtml(l)}</p>`).join("")}</details>`;
         continue;
       }
-      html += `<h2><span>${esc(s.label)}</span>${s.citation ? `<small>${esc(s.citation)}</small>` : ""}</h2>`;
+      html += `<section class="${s.proper ? "proper" : "reading"}"><h2><span>${esc(s.label)}</span>${s.citation ? `<small>${esc(s.citation)}</small>` : ""}</h2>`;
       for (const line of s.lines) {
         const cls = RUBRIC.test(line.zh) ? "zh rubric" : /^【答】|^答[:：]/.test(line.zh) ? "zh resp" : /^——/.test(line.zh) ? "zh accl" : /^恭讀/.test(line.zh) ? "zh intro" : "zh";
         html += `<p class="${cls}">${RUBRIC.test(line.zh) ? esc(line.zh) : lineHtml(line)}</p>`;
       }
-      html += enHtml(s);
+      html += enHtml(s) + laHtml(s) + "</section>";
     }
     main.innerHTML = html;
     $("src").textContent = day.source && day.source.startsWith("http") ? `來源：${day.source.replace(/^https?:\/\//, "")} · ${day.generated.slice(0, 10)}` : "";
@@ -112,6 +123,8 @@
   $("today").onclick = () => show(hkToday());
   $("tRuby").onclick = () => { settings.ruby = !settings.ruby; saveSettings(); applySettings(); };
   $("tEn").onclick = () => { settings.en = !settings.en; saveSettings(); applySettings(); };
+  $("tLa").onclick = () => { settings.la = !settings.la; saveSettings(); applySettings(); };
+  $("tProp").onclick = () => { settings.propers = !settings.propers; saveSettings(); applySettings(); };
   $("sizeDown").onclick = () => { settings.size = Math.max(14, settings.size - 1); saveSettings(); applySettings(); };
   $("sizeUp").onclick = () => { settings.size = Math.min(34, settings.size + 1); saveSettings(); applySettings(); };
   window.addEventListener("hashchange", () => { const d = dateFromHash(); if (d && d !== current) show(d); });
