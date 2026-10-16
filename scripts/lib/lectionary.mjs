@@ -44,7 +44,7 @@ export const US_ABBR = {
 /** Parse "Mk 6:14-29", "Ps 18:31, 47, 50, 51", "1 Cor 15:1-8, 11", "Is 7:10-14; 8:10" into {book, verses:Set<"c:v">}. */
 export function parseUsCitation(text) {
   if (!text) return null;
-  const t = text.replace(/[–—]/g, "-").replace(/\s+/g, " ").trim();
+  const t = text.replace(/[–—]/g, "-").replace(/\s+/g, " ").trim().replace(/^(?:see|cf\.?|or)\s+/i, "");
   const m = /^((?:[1-3] ?)?[A-Za-z]+)\.? ?(\d+[:,\d\s\-;ab]*)$/.exec(t) || /^((?:[1-3] ?)?[A-Za-z]+)\.? (\d.*)$/.exec(t);
   if (!m) return null;
   const book = US_ABBR[m[1].toLowerCase().replace(/\s+/g, "")];

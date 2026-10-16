@@ -18,6 +18,8 @@ test("US citations", () => {
   assert.equal(parseUsCitation("Is 7:10-14; 8:10").verses.size, 6);
   assert.equal(parseUsCitation("Sg 2:8-14").book, "SNG");
   assert.equal(parseUsCitation("Lectionary: 471"), null);
+  assert.equal(parseUsCitation("See Lk 8:15").raw, "Lk 8:15");
+  assert.equal(parseUsCitation("Cf. Jn 15:16").book, "JHN");
 });
 
 test("parse USCCB readings page", () => {
