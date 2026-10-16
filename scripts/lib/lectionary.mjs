@@ -125,24 +125,29 @@ export class Lectionary {
   async day(isoDate) {
     if (this.mem.has(isoDate)) return this.mem.get(isoDate);
     const path = join(this.cacheDir, `${isoDate}.json`);
-    let blocks = [];
+    const url = readingsUrl(isoDate);
+    let html = null;
     if (existsSync(path)) {
-      blocks = JSON.parse(readFileSync(path, "utf8")).blocks;
-    } else {
-      const url = readingsUrl(isoDate);
-      const { status, html } = await this.fetcher.get(url);
-      if (html) {
+      const obj = JSON.parse(readFileSync(path, "utf8"));
+      html = obj.html ?? null; // older cache entries stored parsed blocks only; refetch those
+    }
+    if (html == null) {
+      const r = await this.fetcher.get(url);
+      if (r.html) {
+        html = r.html;
         this.fetched++;
-        blocks = parseReadingsHtml(html).map((b) => ({ ...b, citation: { book: b.citation.book, verses: [...b.citation.verses], raw: b.citation.raw } }));
-        if (!blocks.length) {
-          this.failed.push(`${url}: fetched but no reading blocks recognised`);
-          this.log.warn(`! Lectionary parse failed for ${url}; first lines of page text:`);
-          for (const l of htmlToLines(html).slice(0, 80)) this.log.warn("  | " + l);
-        } else {
-          mkdirSync(this.cacheDir, { recursive: true });
-          writeFileSync(path, JSON.stringify({ date: isoDate, url, fetched: new Date().toISOString(), blocks }));
-        }
-      } else if (status === 404) this.failed.push(`${url}: 404`);
+        mkdirSync(this.cacheDir, { recursive: true });
+        writeFileSync(path, JSON.stringify({ date: isoDate, url, fetched: new Date().toISOString(), html }));
+      } else if (r.status === 404) this.failed.push(`${url}: 404`);
+    }
+    let blocks = [];
+    if (html != null) {
+      blocks = parseReadingsHtml(html).map((b) => ({ ...b, citation: { book: b.citation.book, verses: [...b.citation.verses], raw: b.citation.raw } }));
+      if (!blocks.length) {
+        this.failed.push(`${url}: fetched but no reading blocks recognised`);
+        this.log.warn(`! Lectionary parse failed for ${url}; first lines of page text:`);
+        for (const l of htmlToLines(html).slice(0, 80)) this.log.warn("  | " + l);
+      }
     }
     this.mem.set(isoDate, blocks);
     return blocks;
