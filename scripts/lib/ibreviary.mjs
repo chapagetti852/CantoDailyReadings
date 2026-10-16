@@ -13,11 +13,15 @@ import { parseUsCitation } from "./lectionary.mjs";
 export const BASE = "https://www.ibreviary.com/m2/";
 const DATE_PARAMS = ["date", "data", "giorno"];
 const DATE_FORMATS = [(y, m, d) => `${y}${m}${d}`, (y, m, d) => `${y}-${m}-${d}`, (y, m, d) => `${d}/${m}/${y}`];
-// Slugs to try when the index page gives no usable link.
-const SECTION_GUESSES = ["antifone_e_orazioni", "antifone", "orazioni", "messa_del_giorno", "messa", "proprio", "propri"];
 
 export const KIND_OF_HEADING = [
   ["entrance", /^(entrance antiphon|antiphona ad introitum|ad introitum|introit)/i],
+  ["reading1", /^(first reading|reading i\b|reading 1\b|lectio prima|prima lectio|lectio i\b)/i],
+  ["psalm", /^(responsorial psalm|psalmus responsorius|psalm)/i],
+  ["reading2", /^(second reading|reading ii\b|reading 2\b|lectio secunda|altera lectio|lectio ii\b)/i],
+  ["sequence", /^(sequence|sequentia)/i],
+  ["alleluia", /^(gospel acclamation|alleluia|versus ante evangelium|acclamation)/i],
+  ["gospel", /^(gospel|evangelium)/i],
   ["collect", /^(collect|collecta|oratio collecta|opening prayer)/i],
   ["offertory", /^(prayer over the (offerings|gifts)|super oblata|oratio super oblata)/i],
   ["preface", /^(preface|praefatio)/i],
@@ -25,6 +29,7 @@ export const KIND_OF_HEADING = [
   ["postcommunion", /^(prayer after communion|post communionem|oratio post communionem)/i],
   ["over_people", /^(prayer over the people|super populum|oratio super populum|solemn blessing)/i],
 ];
+const PROPER = new Set(["entrance", "collect", "offertory", "preface", "communion", "postcommunion", "over_people"]);
 const KIND_RE = new RegExp(KIND_OF_HEADING.map(([, re]) => `(?:${re.source})`).join("|"), "i");
 const NOISE = /^(today|oggi|home|menu|back|indietro|options|opzioni|calendar|calendario|share|condividi|www\.|©|copyright|ibreviary|font|print|stampa|settings)/i;
 const CITE_LINE = /^(?:cf\.?\s*)?(?:[1-3]\s?)?[A-Z][a-z]{0,4}\.?\s*\d+\s*(?:\(\d+\))?\s*[:,]\s*\d/i;
@@ -89,13 +94,8 @@ export class IBreviary {
     this.cacheDir = cacheDir; this.log = log;
     this.fetcher = fetcher ?? new PoliteFetcher({ delayMs: 2500, log });
     this.mem = new Map(); this.fetched = 0; this.failed = []; this.dumped = false;
-    this.discovery = this.loadDiscovery();
+    this.discovery = { dateParam: process.env.IB_DATE_PARAM, dateFormat: process.env.IB_DATE_FORMAT ? Number(process.env.IB_DATE_FORMAT) : undefined };
   }
-  loadDiscovery() {
-    const p = join(this.cacheDir, "discovery.json");
-    try { return JSON.parse(readFileSync(p, "utf8")); } catch { return {}; }
-  }
-  saveDiscovery() { mkdirSync(this.cacheDir, { recursive: true }); writeFileSync(join(this.cacheDir, "discovery.json"), JSON.stringify(this.discovery)); }
 
   dateQuery(iso) {
     const [y, m, d] = ymd(iso);
@@ -104,51 +104,41 @@ export class IBreviary {
     return `${p}=${encodeURIComponent(f(y, m, d))}`;
   }
 
-  /** Find the "antiphons and prayers" section slug from the Missal index page once. */
-  async discoverSection(iso, lang) {
-    if (this.discovery.section) return this.discovery.section;
-    const url = `${BASE}messale.php?lang=${lang}&${this.dateQuery(iso)}`;
-    const { html } = await this.fetcher.get(url);
-    if (!html) return null;
-    const links = [...html.matchAll(/<a[^>]*href="([^"]*messale\.php[^"]*)"[^>]*>([\s\S]*?)<\/a>/gi)]
-      .map((m) => ({ href: decodeEntities(m[1]), text: decodeEntities(m[2].replace(/<[^>]+>/g, "")).replace(/\s+/g, " ").trim() }));
-    this.log.log(`iBreviary index links (${url}):`);
-    for (const l of links) this.log.log(`  ${l.text}  ->  ${l.href}`);
-    const pick = links.find((l) => /antif|antiphon|orazion|prayer|oratio|proprio|proper/i.test(l.text + " " + l.href));
-    if (pick) {
-      const sm = /[?&]s=([^&]+)/.exec(pick.href);
-      if (sm) { this.discovery.section = sm[1]; this.saveDiscovery(); return sm[1]; }
-    }
-    return null;
+  pageUrl(iso, lang) { return `${BASE}messale.php?lang=${lang}&${this.dateQuery(iso)}`; }
+
+  dumpOnce(url, html, why) {
+    if (this.dumped) return;
+    this.dumped = true;
+    const langs = [...new Set([...html.matchAll(/[?&]lang=([a-z]{2})\b/gi)].map((m) => m[1].toLowerCase()))];
+    this.log.log(`iBreviary ${why}: ${url}; title="${titleOf(html)}"; language codes on page: ${langs.join(", ") || "none"}`);
+    for (const l of htmlToLines(html).slice(0, 70)) this.log.log("  | " + l);
   }
 
   async page(iso, lang) {
     const key = `${iso}/${lang}`;
     if (this.mem.has(key)) return this.mem.get(key);
     const path = join(this.cacheDir, lang, `${iso}.json`);
-    let html = null, url = null;
-    if (existsSync(path)) ({ html, url } = JSON.parse(readFileSync(path, "utf8")));
+    let html = null;
+    const url = this.pageUrl(iso, lang);
+    if (existsSync(path)) ({ html } = JSON.parse(readFileSync(path, "utf8")));
     if (html == null) {
-      const section = await this.discoverSection(iso, lang);
-      const slugs = [...(section ? [section] : []), ...SECTION_GUESSES.filter((s) => s !== section)];
-      for (const s of slugs) {
-        const u = `${BASE}messale.php?s=${s}&lang=${lang}&${this.dateQuery(iso)}`;
-        const r = await this.fetcher.get(u);
-        if (!r.html) continue;
-        const parsed = parseMissalHtml(r.html);
-        if (parsed.blocks.length) { html = r.html; url = u; this.fetched++; break; }
-        if (!this.dumped) {
-          this.dumped = true;
-          this.log.warn(`! iBreviary page fetched but no Missal headings recognised: ${u}; title="${titleOf(r.html)}"; first lines:`);
-          for (const l of htmlToLines(r.html).slice(0, 80)) this.log.warn("  | " + l);
-        }
+      const r = await this.fetcher.get(url);
+      if (!r.html) { this.failed.push(`${key}: not fetched`); this.mem.set(key, null); return null; }
+      const parsed = parseMissalHtml(r.html);
+      if (!parsed.blocks.some((b) => PROPER.has(b.kind))) {
+        this.dumpOnce(url, r.html, "page fetched but no Missal proper headings recognised");
+        this.failed.push(`${key}: no proper headings recognised`);
+        this.mem.set(key, null);
+        return null;
       }
-      if (html == null) { this.failed.push(`${key}: no usable Missal page`); this.mem.set(key, null); return null; }
+      this.dumpOnce(url, r.html, "first Missal page");
+      html = r.html;
+      this.fetched++;
       mkdirSync(join(this.cacheDir, lang), { recursive: true });
       writeFileSync(path, JSON.stringify({ date: iso, lang, url, fetched: new Date().toISOString(), html }));
     }
     const parsed = parseMissalHtml(html);
-    const out = { url, title: parsed.title, sets: groupSets(parsed.blocks) };
+    const out = { url, title: parsed.title, sets: groupSets(parsed.blocks.filter((b) => PROPER.has(b.kind))) };
     this.mem.set(key, out);
     return out;
   }

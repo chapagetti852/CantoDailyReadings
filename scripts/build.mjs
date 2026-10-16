@@ -167,9 +167,16 @@ for (const date of dates) {
     }
   }
   // English day title: the USCCB page's when it is the same day, else a translation of the HK ferial title.
+  // The US title is used only when it is the same kind of day: a US-only memorial must
+  // not label a Hong Kong ferial day, and vice versa.
+  let ferialEn = null;
+  for (const t of page.title) { ferialEn = englishDayTitle(t); if (ferialEn) break; }
+  const hkFeast = page.title.some((t) => /（(紀念|自由紀念|慶日|節)）|節$/.test(t));
+  let usTitle = english && firstGospelMatched ? await lect.title(date) : null;
+  const usFeast = usTitle ? /memorial|feast|solemnity|saint|blessed/i.test(usTitle) : false;
   let titleEn = null;
-  if (english && firstGospelMatched) titleEn = await lect.title(date);
-  if (!titleEn) for (const t of page.title) { titleEn = englishDayTitle(t); if (titleEn) break; }
+  if (hkFeast) titleEn = usFeast ? usTitle : ferialEn;
+  else titleEn = ferialEn ?? (usFeast ? null : usTitle);
   // The acclamation has no citation on the HK page; when the Gospel of the same
   // day matches the US lectionary, its acclamation is used too.
   async function attachAlleluia() {

@@ -8,10 +8,10 @@ import { PoliteFetcher } from "../scripts/lib/polite.mjs";
 test("parse an iBreviary Missal page", () => {
   const { title, blocks } = parseMissalHtml(readFileSync("test/fixtures/ibreviary-en.html", "utf8"));
   assert.equal(title[0], "Friday of the Twenty-eighth Week in Ordinary Time");
-  assert.deepEqual(blocks.map((b) => b.kind), ["entrance", "collect", "offertory", "communion", "postcommunion"]);
+  assert.deepEqual(blocks.map((b) => b.kind), ["entrance", "collect", "reading1", "psalm", "gospel", "offertory", "communion", "postcommunion"]);
   assert.equal(blocks[0].citation, "Ps 130 (129):3-4");
   assert.equal(blocks[0].lines[0], "If you, O Lord, should mark iniquities,");
-  assert.equal(blocks[3].citation, "Ps 34 (33):11");
+  assert.equal(blocks[6].citation, "Ps 34 (33):11");
   assert.match(blocks[1].lines.at(-1), /for ever and ever\.$/);
   assert.ok(!blocks.at(-1).lines.some((l) => /iBreviary/.test(l)));
   assert.equal(groupSets(blocks).length, 1);
@@ -34,8 +34,7 @@ test("match a HK set and fetch Latin for the same formulary", async () => {
   const urls = [];
   const fetcher = new PoliteFetcher({ delayMs: 0, fetchImpl: async (url) => {
     urls.push(url);
-    const index = !/[?&]s=/.test(url);
-    const body = index ? `<a href="messale.php?s=antifone_e_orazioni&lang=en">Antiphons and Prayers</a>` : (/lang=la/.test(url) ? la : en);
+    const body = /lang=la/.test(url) ? la : en;
     return { ok: true, status: 200, text: async () => body, headers: new Map() };
   } });
   const ib = new IBreviary({ cacheDir: dir, fetcher, log: { log() {}, warn() {} } });
@@ -43,8 +42,8 @@ test("match a HK set and fetch Latin for the same formulary", async () => {
   assert.ok(m.en, "matched");
   assert.equal(m.en.find((b) => b.kind === "collect").lines[0], "May your grace, O Lord, we pray,");
   assert.equal(m.la.find((b) => b.kind === "collect").lines[0], "Tua nos, quaesumus, Domine, gratia semper et praeveniat et sequatur,");
-  assert.ok(urls[0].includes("messale.php?lang=en"), "index discovered first");
-  assert.ok(urls[1].includes("s=antifone_e_orazioni"), "discovered slug used");
+  assert.ok(urls[0].includes("messale.php?lang=en&date=20261016"), "Mass of the day page");
+  assert.ok(urls[1].includes("lang=la"), "Latin fetched after a match");
   const none = await ib.match("2026-10-16", { entrance: parseCitation("詠70:2"), communion: null });
   assert.equal(none.en, null);
   rmSync(dir, { recursive: true, force: true });
