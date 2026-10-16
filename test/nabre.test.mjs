@@ -24,7 +24,7 @@ test("parse a NABRE chapter page", () => {
 });
 
 test("psalm strophe numerals and headings are dropped", () => {
-  const html = `<body><div class="content-body"><p class="s1">Zion, the Royal City of God</p><p><span class="bcv">1</span> A psalm.</p><p>I</p><p><span class="bcv">2</span> Sing a new song.</p><p>II</p><p class="s1">The Lord's Day</p><p><span class="bcv">3</span> Shout with joy.</p></div></body>`;
+  const html = `<body><div class="content-body"><p class="s1">Zion, the Royal City of God</p><p><span class="bcv">1</span> A psalm.<span class="s2">I</span></p><p><span class="bcv">2</span> Sing a new song.</p><p>II</p><p class="s1">The Lord's Day</p><p><span class="bcv">3</span> Shout with joy.</p></div></body>`;
   const { verses } = parseChapterHtml(html);
   assert.deepEqual([...verses.entries()], [[1, "A psalm."], [2, "Sing a new song."], [3, "Shout with joy."]]);
 });

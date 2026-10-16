@@ -27,6 +27,8 @@ export const SLUG = {
   "2PE": "2peter", "1JN": "1john", "2JN": "2john", "3JN": "3john", JUD: "jude", REV: "revelation",
 };
 const ALT_SLUGS = { SNG: ["songofsolomon", "canticleofcanticles"], REV: ["apocalypse"] };
+/** Bump when the parser changes so cached chapters are fetched and parsed again. */
+export const CACHE_V = 2;
 const ONE_CHAPTER = new Set(["OBA", "PHM", "2JN", "3JN", "JUD"]);
 
 /** Candidate URLs for a chapter, most likely first. */
@@ -70,6 +72,8 @@ function stripNotes(html) {
     // section headings ("The Death of John the Baptist.") and chapter headings
     .replace(/<p\b[^>]*class="[^"]*\bs\d\b[^"]*"[^>]*>[\s\S]*?<\/p>/gi, "")
     .replace(/<h[1-6]\b[^>]*>[\s\S]*?<\/h[1-6]>/gi, "")
+    // psalm strophe numerals in an element of their own
+    .replace(/<(p|div|span|strong|b|em|i)\b[^>]*>\s*[IVX]{1,5}\s*<\/\1>/gi, "")
     // footnote / cross-reference markers: links or superscripts whose content is a letter or symbol
     .replace(/<a\b[^>]*>\s*(?:[a-z]|\*|†|‡|\[[^\]]{1,6}\])\s*<\/a>/gi, "")
     .replace(/<sup\b[^>]*>\s*(?:[a-z]{1,2}|\*|†|‡)\s*<\/sup>/gi, "")
@@ -128,15 +132,17 @@ export class Nabre {
     const path = this.cachePath(book, chapter);
     if (existsSync(path)) {
       const obj = JSON.parse(readFileSync(path, "utf8"));
-      const map = new Map(Object.entries(obj.verses).map(([k, v]) => [Number(k), v]));
-      this.mem.set(key, map);
-      return map;
+      if (obj.v === CACHE_V) {
+        const map = new Map(Object.entries(obj.verses).map(([k, v]) => [Number(k), v]));
+        this.mem.set(key, map);
+        return map;
+      }
     }
     const map = await this.download(book, chapter);
     this.mem.set(key, map);
     if (map && map.size) {
       mkdirSync(join(this.cacheDir, book), { recursive: true });
-      writeFileSync(path, JSON.stringify({ book, chapter, fetched: new Date().toISOString(), verses: Object.fromEntries(map) }));
+      writeFileSync(path, JSON.stringify({ v: CACHE_V, book, chapter, fetched: new Date().toISOString(), verses: Object.fromEntries(map) }));
     }
     return map;
   }
@@ -147,6 +153,7 @@ export class Nabre {
       if (status === 404) continue;
       if (!html) return null; // blocked, capped or failed: already recorded by the fetcher
       this.fetched++;
+      if (this.dumpRaw) { this.log.log(`NABRE page text (${url}):`); for (const l of htmlToLines(html).slice(0, 160)) this.log.log("  | " + l); }
       const { verses, markerPattern } = parseChapterHtml(html);
       if (!verses.size) {
         this.failed.push(`${url}: page fetched but no verses recognised (marker pattern ${markerPattern})`);

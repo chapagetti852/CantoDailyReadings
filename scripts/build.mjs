@@ -60,6 +60,7 @@ const english = !has("--no-english");
 const DUMP_DAYS = new Set((opt("--dump-days") ?? process.env.DUMP_DAYS ?? "").split(",").map((x) => x.trim()).filter(Boolean));
 const fetcher = new PoliteFetcher({ maxFetches: Number(process.env.MAX_FETCHES ?? 60) });
 const nabre = english ? new Nabre({ fetcher }) : null;
+if (nabre) nabre.dumpRaw = DUMP_DAYS.size > 0;
 const lect = english ? new Lectionary({ fetcher }) : null;
 const ib = english ? new IBreviary({ fetcher: new PoliteFetcher({ delayMs: 2500, maxFetches: Number(process.env.IB_MAX_FETCHES ?? 130) }) }) : null;
 const PROPER_KINDS = new Set(["entrance", "collect", "offertory", "preface", "communion", "postcommunion", "blessing"]);
