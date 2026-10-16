@@ -84,6 +84,17 @@ const KIND_OF_HEADING = [
  * Blocks are found by <h3> headings; each block's citation is the first link or
  * line that parses as a US citation; the text is everything after it.
  */
+/** The day's title as the USCCB page gives it, e.g. "Friday of the Twenty-eighth Week in Ordinary Time". */
+export function parseDayTitle(html) {
+  const t = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html);
+  let title = t ? decodeEntities(t[1]).replace(/\s+/g, " ").replace(/\s*\|\s*USCCB.*$/i, "").trim() : "";
+  if (!title || /daily readings/i.test(title)) {
+    const h = /<h2[^>]*>([\s\S]*?)<\/h2>/i.exec(html);
+    if (h) title = decodeEntities(h[1].replace(/<[^>]+>/g, "")).replace(/\s+/g, " ").trim();
+  }
+  return title || null;
+}
+
 export function parseReadingsHtml(html) {
   const body = html.replace(/<(script|style|noscript|nav|header|footer|aside|form)\b[\s\S]*?<\/\1>/gi, "");
   const pieces = body.split(/<h3\b[^>]*>/i).slice(1);
@@ -126,8 +137,11 @@ export function overlap(hk, us) {
 export class Lectionary {
   constructor({ cacheDir = "cache/usccb", fetcher, log = console, minOverlap = 0.8 } = {}) {
     this.cacheDir = cacheDir; this.fetcher = fetcher ?? new PoliteFetcher({ log }); this.log = log; this.minOverlap = minOverlap;
-    this.mem = new Map(); this.fetched = 0; this.failed = [];
+    this.mem = new Map(); this.titles = new Map(); this.fetched = 0; this.failed = [];
   }
+
+  /** English day title from the cached page, or null. */
+  async title(isoDate) { await this.day(isoDate); return this.titles.get(isoDate) ?? null; }
 
   async day(isoDate) {
     if (this.mem.has(isoDate)) return this.mem.get(isoDate);
@@ -149,6 +163,7 @@ export class Lectionary {
     }
     let blocks = [];
     if (html != null) {
+      this.titles.set(isoDate, parseDayTitle(html));
       blocks = parseReadingsHtml(html).map((b) => ({ ...b, citation: { book: b.citation.book, verses: [...b.citation.verses], raw: b.citation.raw } }));
       if (!blocks.length) {
         this.failed.push(`${url}: fetched but no reading blocks recognised`);

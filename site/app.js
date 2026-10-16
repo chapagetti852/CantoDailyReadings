@@ -63,6 +63,7 @@
     const [first, ...rest] = day.title;
     if (first) html += `<h1>${esc(first.zh)}</h1>`;
     for (const t of rest) html += `<p class="title-sub">${esc(t.zh)}</p>`;
+    if (day.titleEn) html += `<p class="title-en en" lang="en" translate="yes">${esc(day.titleEn)}</p>`;
     for (const s of day.sections) {
       if (s.kind === "divider") {
         const [h, ...more] = s.lines;

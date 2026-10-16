@@ -15,6 +15,7 @@ import { mkdirSync, writeFileSync, readFileSync, cpSync, existsSync } from "node
 import { join } from "node:path";
 import { fetchDlc, parseDlcHtml, CHAPTER_KINDS } from "./lib/dlc.mjs";
 import { Lectionary } from "./lib/lectionary.mjs";
+import { englishDayTitle } from "./lib/daytitle.mjs";
 import { PoliteFetcher } from "./lib/polite.mjs";
 import { makeRomanizer } from "./lib/yale.mjs";
 import { Nabre } from "./lib/nabre.mjs";
@@ -116,8 +117,13 @@ for (const date of dates) {
 
   const sections = [];
   let gospelMatched = false;
+  let firstGospelMatched = false;
   let setStart = 0;
-  for (const s of page.sections) {
+  // Readings only: prayers and antiphons are not shown, so drop them before
+  // English lookup; a divider survives only if readings follow it.
+  const READING_KINDS = new Set(["reading1", "psalm", "reading2", "sequence", "alleluia", "gospel", "divider"]);
+  const kept = page.sections.filter((s) => READING_KINDS.has(s.kind));
+  for (const s of kept) {
     const lines = (s.kind === "divider" && s.heading ? [s.heading, ...s.lines] : s.lines).map((l) => romanize(l));
     const out = { kind: s.kind, label: s.label, heading: s.heading, citation: s.citation?.text ?? null, lines };
     if (english && CHAPTER_KINDS.has(s.kind) && s.citation) {
@@ -125,7 +131,7 @@ for (const date of dates) {
       const m = await lect.match(date, s.citation, { kind: s.kind });
       if (m) {
         out.en = { source: "Lectionary", citation: m.citation, lines: m.lines };
-        if (s.kind === "gospel") gospelMatched = true;
+        if (s.kind === "gospel") { gospelMatched = true; if (setStart === 0) firstGospelMatched = true; }
       } else {
         // 2. Otherwise the NABRE chapter text for the cited verses.
         const { verses, missing } = await nabre.lookup(s.citation);
@@ -137,6 +143,14 @@ for (const date of dates) {
     sections.push(out);
   }
   await attachAlleluia();
+  // Drop dividers that no readings follow (e.g. an optional memorial that only has prayers).
+  for (let i = sections.length - 1; i >= 0; i--) {
+    if (sections[i].kind === "divider" && (i === sections.length - 1 || sections[i + 1].kind === "divider")) sections.splice(i, 1);
+  }
+  // English day title: the USCCB page's when it is the same day, else a translation of the HK ferial title.
+  let titleEn = null;
+  if (english && firstGospelMatched) titleEn = await lect.title(date);
+  if (!titleEn) for (const t of page.title) { titleEn = englishDayTitle(t); if (titleEn) break; }
   // The acclamation has no citation on the HK page; when the Gospel of the same
   // day matches the US lectionary, its acclamation is used too.
   async function attachAlleluia() {
@@ -145,13 +159,13 @@ for (const date of dates) {
     const b = a && await lect.blockOfKind(date, "alleluia");
     if (b) a.en = { source: "Lectionary", citation: b.citation, lines: b.lines };
   }
-  if (page.notes.length) sections.push({ kind: "note", label: "簡介", heading: "", citation: null, lines: page.notes.map((l) => romanize(l)) });
 
   const day = {
     date,
     source: fixture ? "fixture" : url,
     generated: new Date().toISOString(),
     title: page.title.map((t) => romanize(t)),
+    titleEn,
     sections,
   };
   writeFileSync(join(DATA, `${date}.json`), JSON.stringify(day));
@@ -166,7 +180,7 @@ for (const date of dates) {
   }
   built.push(date);
   const kinds = sections.map((s) => s.kind + (s.en ? (s.en.source === "Lectionary" ? "+lect" : "+nabre") : "")).join(" ");
-  console.log(`${date}: ${sections.length} sections [${kinds}] title="${page.title.join(" / ")}"`);
+  console.log(`${date}: ${sections.length} sections [${kinds}] title="${page.title.join(" / ")}"${titleEn ? ` en="${titleEn}"` : ""}`);
 }
 
 // Keep dates from a previous deployment that are still inside the window? No:

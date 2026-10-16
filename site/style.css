@@ -33,6 +33,7 @@ main { max-width: 38rem; margin: 0 auto; padding: 1.2rem 0 3rem; }
 /* titles: plain, no ruby */
 h1 { font-size: 1.35rem; font-weight: 600; line-height: 1.45; margin: 0 0 .3rem; letter-spacing: .02em; }
 .title-sub { color: var(--ink-soft); font-size: .95rem; line-height: 1.6; margin: 0 0 .35rem; }
+.title-en { font-family: var(--serif-en); font-style: italic; color: var(--muted); font-size: .95rem; line-height: 1.5; margin: .1rem 0 .4rem; padding: 0; border: 0; }
 h1.divider { margin-top: 3rem; padding-top: 1.4rem; border-top: 1px solid var(--rule); }
 
 /* section headings: small caps feel, hairline */

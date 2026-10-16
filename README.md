@@ -1,9 +1,9 @@
 # Canto Daily Readings · 每日讀經
 
 Personal, mobile-first web page showing the Hong Kong Diocese daily Mass readings
-and propers in Chinese, with **Yale Cantonese romanization as ruby text** over every
-character and the **New American Bible, Revised Edition (NABRE)** text of the same
-scripture passages underneath.
+(first and second reading, psalm, Gospel acclamation and Gospel) in Chinese, with
+**Yale Cantonese romanization as ruby text** over every character and the official
+English (US Lectionary, else **NABRE**) of the same passages underneath.
 
 Everything is static and hosted on GitHub Pages. A scheduled GitHub Action rebuilds the
 site every night, so no server and no API keys are involved.
@@ -23,9 +23,10 @@ bible.usccb.org/bible/<book>/<ch> ──► scripts/lib/nabre.mjs (NABRE verses 
 - **Rolling window.** Each build fetches 3 days back and 14 days ahead (Hong Kong time)
   and deploys them as a Pages artifact. The texts are never committed to git; they live
   only in the current deployment. The page carries `noindex` and a `robots.txt`.
-- **Chinese source.** The Diocesan Liturgy Commission's daily page, one per date.
-  Sections recognised: 進堂詠, 集禱經, 讀經一, 答唱詠, 讀經二, 繼抒詠, 福音前歡呼, 福音,
-  獻禮經, 頌謝詞, 領主詠, 領聖體後經.
+- **Chinese source.** The Diocesan Liturgy Commission's daily page, one per date. The
+  parser recognises the whole Missal layout, but the site shows readings only: 讀經一,
+  答唱詠, 讀經二, 繼抒詠, 福音前歡呼, 福音. Days with alternative sets of readings get a
+  divider per set.
 - **Romanization.** `to-jyutping` (BSD-2, built on the CC-BY rime-cantonese lexicon) gives
   word-aware Jyutping; a small converter turns it into Yale with diacritics (tone 1 = macron).
   Fix a mispronunciation by adding the word to `overrides.json`.
@@ -40,7 +41,9 @@ bible.usccb.org/bible/<book>/<ch> ──► scripts/lib/nabre.mjs (NABRE verses 
   challenge, which the build treats as "not today" rather than trying to defeat; the
   workflow therefore runs every three hours and fills the window over a day.
   NABRE and 思高 share the Hebrew chapter/verse numbering, so no re-versification is needed.
-  Antiphons, collects and other prayers are Chinese only.
+  The day's name is shown in English under the Chinese title when EN is on: the USCCB
+  page's title when it is the same day, otherwise a translation of the Hong Kong ferial
+  or Sunday title (`scripts/lib/daytitle.mjs`).
 - **App.** `site/` is plain HTML/CSS/JS: date arrows and swipe, Yale and EN toggles, text
   size, dark mode, offline cache of visited days via a service worker, installable to the
   home screen. The page is marked `translate="no"` so browsers do not offer to translate
