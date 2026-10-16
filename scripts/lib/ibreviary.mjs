@@ -36,6 +36,7 @@ export const KIND_OF_HEADING = [
   ["over_people", /^(prayer over the people|super populum|oratio super populum|solemn blessing)/i],
 ];
 const PROPER = new Set(["entrance", "collect", "offertory", "preface", "communion", "postcommunion", "over_people"]);
+const CACHE_V = 2; // bump when the stored line extraction changes
 const REQUIRED = new Set(["entrance", "collect", "communion", "postcommunion"]);
 const KIND_RE = new RegExp(KIND_OF_HEADING.map(([, re]) => `(?:${re.source})`).join("|"), "i");
 const NOISE = /^(today|oggi|home|-?\s*menu\s*-?$|back|indietro|options|opzioni|calendar|calendario|share|condividi|www\.|©|copyright|ibreviary|font|print|stampa|settings)/i;
@@ -189,18 +190,18 @@ export class IBreviary {
       find(/offerings|oblata|offerte|ofrendas|offrandes|gifts/i),
       find(/after communion|post communionem|dopo la comunione|comuni[oó]n|communion/i),
     ].filter(Boolean);
-    const menuTexts = new Set([...links.map((l) => l.text), ...htmlToLines(html)]);
-    const out = { picks, menuTexts };
+    const menuLines = htmlToLines(html).filter((l) => !NOISE.test(l));
+    const out = { picks, menuLines };
     this.sectionsCache[lang] = out;
     this.log.log(`iBreviary proper pages: ${picks.map((p) => p.href).join(" | ") || "none found"}`);
     return out;
   }
 
-  /** Remove the site menu lines that head every page. */
-  static stripMenu(lines, menuTexts) {
+  /** Every page starts with the same lines as the menu page; drop that common prefix only. */
+  static stripMenu(lines, menuLines) {
     let i = 0;
-    while (i < lines.length && menuTexts.has(lines[i])) i++;
-    return lines.slice(i).filter((l) => !menuTexts.has(l) || l.length > 40);
+    while (i < lines.length && i < menuLines.length && lines[i] === menuLines[i]) i++;
+    return lines.slice(i);
   }
 
   dumpOnce(url, lines, why) {
@@ -221,7 +222,7 @@ export class IBreviary {
     let pages = null;
     if (existsSync(path)) {
       const obj = JSON.parse(readFileSync(path, "utf8"));
-      if (obj.pages && obj.dateQuery === q) pages = obj.pages; // entries fetched with another date format are stale
+      if (obj.pages && obj.dateQuery === q && obj.v === CACHE_V) pages = obj.pages; // other formats / older strippers are stale
     }
     if (pages == null) {
       pages = [];
@@ -230,7 +231,7 @@ export class IBreviary {
         const url = `${BASE}${pick.href}${sep}lang=${lang}&${this.dateQuery(iso)}`;
         const r = await this.fetcher.get(url);
         if (!r.html) { this.failed.push(`${key}: ${pick.text} not fetched`); continue; }
-        const lines = IBreviary.stripMenu(htmlToLines(r.html).filter((l) => !NOISE.test(l)), sec.menuTexts);
+        const lines = IBreviary.stripMenu(htmlToLines(r.html).filter((l) => !NOISE.test(l)), sec.menuLines);
         if (lang === "la" && !this.laDumped) { this.laDumped = true; this.log.log(`iBreviary Latin sample (${url}):`); for (const l of lines.slice(0, 12)) this.log.log("  | " + l); }
         this.dumpOnce(url, lines, "first proper page");
         const antiphonKind = /offer|oblat/i.test(pick.text + pick.href) ? null : /commun|comuni/i.test(pick.text + pick.href) ? "communion" : "entrance";
@@ -245,10 +246,11 @@ export class IBreviary {
       }
       this.fetched += pages.length;
       mkdirSync(join(this.cacheDir, lang), { recursive: true });
-      writeFileSync(path, JSON.stringify({ date: iso, lang, dateQuery: q, fetched: new Date().toISOString(), pages }));
+      writeFileSync(path, JSON.stringify({ v: CACHE_V, date: iso, lang, dateQuery: q, fetched: new Date().toISOString(), pages }));
     }
     const parsed = parsePages(pages);
     const out = { url: pages[0]?.url, title: parsed.title, sets: groupSets(parsed.blocks.filter((b) => PROPER.has(b.kind) && b.lines.length)) };
+    if (!this.kindsLogged?.[lang]) { (this.kindsLogged ??= {})[lang] = true; this.log.log(`iBreviary ${lang} ${iso}: blocks ${parsed.blocks.map((b) => `${b.kind}(${b.lines.length})`).join(" ")}`); }
     this.mem.set(key, out);
     return out;
   }

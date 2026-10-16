@@ -59,7 +59,7 @@ const english = !has("--no-english");
 const fetcher = new PoliteFetcher({ maxFetches: Number(process.env.MAX_FETCHES ?? 60) });
 const nabre = english ? new Nabre({ fetcher }) : null;
 const lect = english ? new Lectionary({ fetcher }) : null;
-const ib = english ? new IBreviary({ fetcher: new PoliteFetcher({ delayMs: 2500, maxFetches: Number(process.env.MAX_FETCHES ?? 60) }) }) : null;
+const ib = english ? new IBreviary({ fetcher: new PoliteFetcher({ delayMs: 2500, maxFetches: Number(process.env.IB_MAX_FETCHES ?? 130) }) }) : null;
 const PROPER_KINDS = new Set(["entrance", "collect", "offertory", "preface", "communion", "postcommunion", "blessing"]);
 
 const fixture = opt("--fixture");
