@@ -35,8 +35,10 @@ bible.usccb.org/bible/<book>/<ch> ──► scripts/lib/nabre.mjs (NABRE verses 
      overlap of 80% or more), its Lectionary wording is used; the Gospel acclamation comes
      along when the Gospel matches.
   2. Otherwise the cited verses are taken from the NABRE chapter pages on the USCCB site.
-  Pages are fetched politely (one every few seconds, retry with backoff, a per-run cap, and
-  a stop on persistent 403) and kept in the Actions cache, so each page is fetched once.
+  Pages are fetched politely and kept in the Actions cache, so each page is fetched once.
+  The USCCB site serves about three pages per run before answering with a JavaScript
+  challenge, which the build treats as "not today" rather than trying to defeat; the
+  workflow therefore runs every three hours and fills the window over a day.
   NABRE and 思高 share the Hebrew chapter/verse numbering, so no re-versification is needed.
   Antiphons, collects and other prayers are Chinese only.
 - **App.** `site/` is plain HTML/CSS/JS: date arrows and swipe, Yale and EN toggles, text
