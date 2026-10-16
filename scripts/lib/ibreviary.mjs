@@ -181,6 +181,11 @@ export class IBreviary {
   async sections(iso, lang) {
     this.sectionsCache ??= {};
     if (this.sectionsCache[lang]) return this.sectionsCache[lang];
+    const diskPath = join(this.cacheDir, `sections-${lang}.json`);
+    try {
+      const saved = JSON.parse(readFileSync(diskPath, "utf8"));
+      if (saved.v === CACHE_V && saved.picks?.length) { this.sectionsCache[lang] = saved; return saved; }
+    } catch {}
     const menuUrl = `${BASE}letture.php?lang=${lang}&${this.dateQuery(iso)}`;
     const { html } = await this.fetcher.get(menuUrl);
     if (!html) return null;
@@ -194,8 +199,9 @@ export class IBreviary {
       find(/after communion|post communionem|dopo la comunione|comuni[oó]n|communion/i),
     ].filter(Boolean);
     const menuLines = htmlToLines(html).filter((l) => !NOISE.test(l));
-    const out = { picks, menuLines };
+    const out = { v: CACHE_V, picks, menuLines };
     this.sectionsCache[lang] = out;
+    if (picks.length) { mkdirSync(this.cacheDir, { recursive: true }); writeFileSync(diskPath, JSON.stringify(out)); }
     this.log.log(`iBreviary proper pages: ${picks.map((p) => p.href).join(" | ") || "none found"}`);
     return out;
   }
