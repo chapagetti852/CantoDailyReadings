@@ -49,7 +49,11 @@ rt { font-family: var(--sans); font-size: .58rem; line-height: 1; color: var(--r
 body.noruby rt { display: none; }
 body.noruby p.zh { line-height: 1.95; }
 .who { display: inline-block; font-family: var(--sans); font-size: .62rem; letter-spacing: .1em; color: var(--who); border: 1px solid currentColor; border-radius: 3px; padding: .05em .35em; margin-right: .5em; vertical-align: .35em; line-height: 1.4; }
-.who.resp-mark { margin-left: .4em; margin-right: 0; }
+.who.resp-mark { margin-left: .4em; margin-right: .3em; }
+p.zh.resp .who.resp-mark:first-child { margin-left: 0; }
+p.zh.accl { color: var(--ink-soft); margin-top: .2rem; }
+p.zh.intro { color: var(--ink-soft); font-size: .98rem; }
+.en .r { font-family: var(--sans); font-size: .7em; letter-spacing: .08em; color: var(--accent); vertical-align: .1em; }
 
 /* English */
 .en { font-family: var(--serif-en); font-size: 1rem; line-height: 1.55; color: var(--ink-soft); margin: .5rem 0 .9rem; padding-left: .9rem; border-left: 2px solid var(--rule); }

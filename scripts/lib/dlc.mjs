@@ -53,6 +53,21 @@ function headerFor(line) {
 }
 
 const TITLE_MAX = 36;
+const TRAILING_CITE = new RegExp(`\\s*[（(]\\s*(?:參閱|參|cf\\.?)?\\s*${ABBR_RE.source}\\s*\\d+\\s*[:：][\\d\\s,，、;；\\-–a-z]*[)）]\\s*$`, "u");
+const INTRO_CITE = /^(恭讀.+?)\s*\d+\s*[:：]\s*[\d\s,，、;；\-–a-z]+$/u;
+
+/** Break a page line into display lines: the "——上主的話。" acclamation on its own, citations shown in the heading dropped from the text. */
+function splitLine(line) {
+  let l = line.replace(TRAILING_CITE, "");            // 「…一無所缺。（詠34:11）」 -> drop the reference
+  const im = INTRO_CITE.exec(l);
+  if (im) l = im[1];                                   // 「恭讀聖路加福音 12:1-7」 -> 「恭讀聖路加福音」
+  const parts = [];
+  for (const piece of l.split(/(?=——)/)) {
+    const t = piece.trim();
+    if (t) parts.push(t);
+  }
+  return parts.length ? parts : [l];
+}
 const looksLikeTitle = (l) => l.length <= TITLE_MAX && !/[。；！？]/.test(l) && !/^[「【]/.test(l);
 const isBiography = (l) => l.length > 120 && /。/.test(l);
 
@@ -102,7 +117,7 @@ export function parseDlcHtml(bytes) {
       if (c) cur.citation = c;
     }
     if (NOISE.test(line) && line.length < 30) continue;
-    cur.lines.push(line);
+    for (const part of splitLine(line)) cur.lines.push(part);
   }
   for (const s of sections) {
     while (s.lines.length && NOISE.test(s.lines[s.lines.length - 1])) s.lines.pop();

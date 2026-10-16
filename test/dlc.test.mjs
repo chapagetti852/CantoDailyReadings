@@ -15,7 +15,7 @@ for (const f of ["mt-sample.htm", "mt-sample-big5.htm"]) {
       ["entrance", "collect", "reading1", "psalm", "alleluia", "gospel", "offertory", "communion", "postcommunion"]);
     const gospel = page.sections.find((s) => s.kind === "gospel");
     assert.equal(gospel.citation.text, "谷 6:14-29");
-    assert.equal(gospel.lines[0], "恭讀聖馬爾谷福音 6:14-29");
+    assert.equal(gospel.lines[0], "恭讀聖馬爾谷福音");
     assert.match(gospel.lines[1], /^那時候/);
     assert.equal(page.sections.find((s) => s.kind === "psalm").citation.text, "詠 18:31, 47, 50, 51");
     assert.equal(page.sections.find((s) => s.kind === "alleluia").citation.text, "瑪 5:10");
@@ -38,4 +38,14 @@ test("second formulary becomes a divider; biography goes to notes", () => {
   assert.equal(page.sections.find((s) => s.kind === "reading1").citation.text, "弗 3:14-21");
   assert.equal(page.sections.find((s) => s.kind === "gospel").citation.text, "路 12:49-53");
   assert.equal(page.sections[8].lines.at(-1), "上主，求你恩賜我們。亞孟。", "biography not left in postcommunion");
+});
+
+test("display lines: acclamation split off, citations dropped from antiphon and intro lines", () => {
+  const page = parseDlcHtml(new Uint8Array(readFileSync("test/fixtures/mt-sample-sets.htm")));
+  const entrance = page.sections.find((s) => s.kind === "entrance");
+  assert.deepEqual(entrance.lines, ["上主，我呼求你，求你快來幫助我。"]);
+  assert.equal(entrance.citation.text, "詠 70:2");
+  const r1 = page.sections.find((s) => s.kind === "reading1");
+  assert.deepEqual(r1.lines, ["恭讀聖保祿宗徒致厄弗所人書", "弟兄們：我在天父面前屈膝。", "——上主的話。", "（默想片刻）"]);
+  assert.equal(r1.citation.text, "弗 3:14-21");
 });

@@ -39,7 +39,7 @@
     const m = SPEAKER.exec(zh);
     if (m) { label = `<span class="who">${esc(m[1])}</span>`; zh = zh.slice(m[0].length); yale = yale.slice(Array.from(m[0]).length); }
     let body = rubyHtml({ zh, yale });
-    body = body.replace(/(?:<ruby>【<rt>[^<]*<\/rt><\/ruby>|【)(?:<ruby>答<rt>[^<]*<\/rt><\/ruby>|答)(?:<ruby>】<rt>[^<]*<\/rt><\/ruby>|】)/g, '<span class="who resp-mark">答</span>');
+    body = body.replace(/(?:<ruby>【<rt>[^<]*<\/rt><\/ruby>|【)(?:<ruby>答<rt>[^<]*<\/rt><\/ruby>|答)(?:<ruby>】<rt>[^<]*<\/rt><\/ruby>|】)(?:[：:])?/g, '<span class="who resp-mark">答</span>');
     return label + body;
   }
 
@@ -52,7 +52,7 @@
       body = s.en.verses.map((v) => `<sup>${esc(v.ref.split(":")[1])}</sup>${esc(v.text)}`).join(" ");
     } else {
       const keepLines = s.kind === "psalm" || s.kind === "alleluia" || s.kind === "sequence";
-      const ls = s.en.lines.map((l) => (/^R\.|^R:/.test(l) ? `<b>${esc(l.replace(/^R\.?\s*(\([^)]*\))?\s*/, "℟. "))}</b>` : esc(l)));
+      const ls = s.en.lines.map((l) => (/^R\.|^R:/.test(l) ? `<b><span class="r">R.</span> ${esc(l.replace(/^R\.?\s*(\([^)]*\))?\s*/, ""))}</b>` : esc(l)));
       body = keepLines ? ls.join("<br>") : ls.join(" ");
     }
     return `<p class="en" lang="en" translate="yes">${body}</p>`;
@@ -76,7 +76,7 @@
       }
       html += `<h2><span>${esc(s.label)}</span>${s.citation ? `<small>${esc(s.citation)}</small>` : ""}</h2>`;
       for (const line of s.lines) {
-        const cls = RUBRIC.test(line.zh) ? "zh rubric" : /^【答】|^答[:：]/.test(line.zh) ? "zh resp" : "zh";
+        const cls = RUBRIC.test(line.zh) ? "zh rubric" : /^【答】|^答[:：]/.test(line.zh) ? "zh resp" : /^——/.test(line.zh) ? "zh accl" : /^恭讀/.test(line.zh) ? "zh intro" : "zh";
         html += `<p class="${cls}">${RUBRIC.test(line.zh) ? esc(line.zh) : lineHtml(line)}</p>`;
       }
       html += enHtml(s);
