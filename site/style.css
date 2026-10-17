@@ -98,6 +98,10 @@ body.noruby p.zh { line-height: 1.95; }
 /* English and Latin: book face, a small red language mark hanging in the margin */
 .en, .la { font-family: var(--en); font-size: 1.05rem; line-height: 1.5; color: var(--ink); margin: 1.1rem 0 1rem; padding-left: 1rem; border-left: 1px solid var(--rule); }
 .en + .la { margin-top: .6rem; }
+/* A proper's translation follows a solid block of ruby lines, whose own line gap is
+   already ~18px; it needs a markedly larger gap to read as a separate text. */
+section.proper .en, section.proper .la { margin-top: 1.9rem; }
+section.proper .en + .la { margin-top: 1.1rem; }
 .la { font-style: italic; }
 .en b { font-weight: 600; }
 .en .r { font-family: var(--ui); font-size: .7em; letter-spacing: .08em; color: var(--rubric); vertical-align: .1em; font-weight: 600; }
