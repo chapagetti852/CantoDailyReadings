@@ -49,3 +49,11 @@ test("display lines: acclamation split off, citations dropped from antiphon and 
   assert.deepEqual(r1.lines, ["恭讀聖保祿宗徒致厄弗所人書", "弟兄們：我在天父面前屈膝。", "——上主的話。", "（默想片刻）"]);
   assert.equal(r1.citation.text, "弗 3:14-21");
 });
+
+test("a dash inside the text does not start a new line", async () => {
+  const { parseDlcHtml } = await import("../scripts/lib/dlc.mjs");
+  const html = `<html><body><p>十一月九日</p><p>讀經一（水從聖殿流出。）</p><p>恭讀厄則克耳先知書 47:1-2</p><p>看，有水湧出，流向東方——因為聖殿正面朝東。——上主的話。</p></body></html>`;
+  const page = parseDlcHtml(new TextEncoder().encode(html));
+  const r = page.sections.find((s) => s.kind === "reading1");
+  assert.deepEqual(r.lines, ["恭讀厄則克耳先知書", "看，有水湧出，流向東方——因為聖殿正面朝東。", "——上主的話。"]);
+});

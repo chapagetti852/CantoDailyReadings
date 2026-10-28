@@ -28,6 +28,11 @@ bible.usccb.org/bible/<book>/<ch> ──► scripts/lib/nabre.mjs (NABRE verses 
   (進堂詠, 集禱經, 獻禮經, 領主詠, 領聖體後經) sit behind the 禱文 toggle, off by default.
   When a page offers several formularies (Mission Sunday, a solemnity with a vigil
   Mass), only the first set is built; the log says how many were omitted.
+- **People's parts.** The page adds what the Diocese's text leaves out
+  (`scripts/lib/dialogue.mjs`): 眾：感謝天主 after each reading, the Gospel dialogue
+  (願主與你們同在 … 主，願光榮歸於你 … 基督，我們讚美你), and the psalm refrain written
+  out after every strophe. The English carries the same parts from the US Missal,
+  including the Lectionary's "A reading from …" line.
 - **Romanization.** `to-jyutping` (BSD-2, built on the CC-BY rime-cantonese lexicon) gives
   word-aware Jyutping; a small converter turns it into Yale with diacritics (tone 1 = macron).
   Fix a mispronunciation by adding the word to `overrides.json`.

@@ -104,6 +104,9 @@ section.proper .en, section.proper .la { margin-top: 1.9rem; }
 section.proper .en + .la { margin-top: 1.1rem; }
 .la { font-style: italic; }
 .en b { font-weight: 600; }
+.en .dlg { display: block; color: var(--ink-2); }
+.en .dlg.pre { margin-bottom: .55rem; }
+.en .dlg.post { margin-top: .55rem; }
 .en .r { font-family: var(--ui); font-size: .7em; letter-spacing: .08em; color: var(--rubric); vertical-align: .1em; font-weight: 600; }
 .en .alt, .la .alt { color: var(--ink-3); font-size: .85em; font-style: italic; }
 body.noread section.reading { display: none; }

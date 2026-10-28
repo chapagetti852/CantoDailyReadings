@@ -63,6 +63,9 @@
 
   const RUBRIC = /^（[^）]*）$|^或$|^\(.*\)$/;
 
+  const enLine = (l) => (/^R\.|^R:/.test(l) ? `<b><span class="r">R.</span> ${esc(l.replace(/^R\.?\s*(\([^)]*\))?\s*/, ""))}</b>` : /^(Or|Vel)\b/.test(l) ? `<i class="alt">${esc(l)}</i>` : esc(l));
+  const dlg = (ls, cls) => (ls && ls.length ? `<span class="dlg ${cls}">${ls.map(enLine).join("<br>")}</span>` : "");
+
   function enHtml(s) {
     if (!s.en) return "";
     let body;
@@ -71,10 +74,10 @@
       body = s.kind === "psalm" ? ls.join("<br>") : ls.join(" ");
     } else {
       const keepLines = s.kind === "psalm" || s.kind === "alleluia" || s.kind === "sequence";
-      const ls = s.en.lines.map((l) => (/^R\.|^R:/.test(l) ? `<b><span class="r">R.</span> ${esc(l.replace(/^R\.?\s*(\([^)]*\))?\s*/, ""))}</b>` : /^(Or|Vel)\b/.test(l) ? `<i class="alt">${esc(l)}</i>` : esc(l)));
+      const ls = s.en.lines.map(enLine);
       body = keepLines ? ls.join("<br>") : ls.join(" ");
     }
-    return `<p class="en" lang="en" translate="yes">${body}</p>`;
+    return `<p class="en" lang="en" translate="yes">${dlg(s.en.pre, "pre")}${body}${dlg(s.en.post, "post")}</p>`;
   }
 
   function laHtml(s) {

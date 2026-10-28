@@ -17,6 +17,7 @@ import { fetchDlc, parseDlcHtml, CHAPTER_KINDS } from "./lib/dlc.mjs";
 import { Lectionary } from "./lib/lectionary.mjs";
 import { englishDayTitle, latinDayTitle } from "./lib/daytitle.mjs";
 import { latinFeastTitle, FEAST_LINE } from "./lib/sanctoral.mjs";
+import { addResponses, expandRefrain, englishFrame } from "./lib/dialogue.mjs";
 import { IBreviary } from "./lib/ibreviary.mjs";
 import { PoliteFetcher } from "./lib/polite.mjs";
 import { makeRomanizer } from "./lib/yale.mjs";
@@ -131,7 +132,10 @@ for (const date of dates) {
   const kept = firstDivider > 0 ? page.sections.slice(0, firstDivider) : page.sections;
   if (firstDivider > 0) console.log(`${date}: ${page.sections.filter((s) => s.kind === "divider").length} alternative formulary set(s) omitted`);
   for (const s of kept) {
-    const lines = (s.kind === "divider" && s.heading ? [s.heading, ...s.lines] : s.lines).map((l) => romanize(l));
+    let raw = s.kind === "divider" && s.heading ? [s.heading, ...s.lines] : s.lines;
+    if (s.kind === "psalm") raw = expandRefrain(raw);
+    raw = addResponses(s.kind, raw);
+    const lines = raw.map((l) => romanize(l));
     const out = { kind: s.kind, label: s.label, heading: s.heading, citation: s.citation?.text ?? null, lines };
     if (PROPER_KINDS.has(s.kind)) out.proper = true;
     if (english && CHAPTER_KINDS.has(s.kind) && s.citation) {
@@ -148,6 +152,15 @@ for (const date of dates) {
         if (verses.length) out.en = { source: "NABRE", book: s.citation.book, verses };
         if (missing.length) out.enMissing = missing;
       }
+    }
+    // The acclamation is matched by its own citation too, so it does not depend on the Gospel.
+    if (english && s.kind === "alleluia" && s.citation) {
+      const m = await lect.match(date, s.citation, { kind: "alleluia" });
+      if (m) out.en = { source: "Lectionary", citation: m.citation, lines: m.lines };
+    }
+    if (out.en) {
+      const frame = englishFrame(s.kind, s.citation?.book);
+      if (frame) Object.assign(out.en, frame);
     }
     if (s.kind === "divider") { await attachAlleluia(); await attachPropers(); gospelMatched = false; setStart = sections.length + 1; }
     sections.push(out);

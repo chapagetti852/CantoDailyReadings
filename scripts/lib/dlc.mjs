@@ -62,7 +62,8 @@ function splitLine(line) {
   const im = INTRO_CITE.exec(l);
   if (im) l = im[1];                                   // 「恭讀聖路加福音 12:1-7」 -> 「恭讀聖路加福音」
   const parts = [];
-  for (const piece of l.split(/(?=——)/)) {
+  // Only the closing acclamation goes on a line of its own; a dash inside the text stays.
+  for (const piece of l.split(/(?=——(?:上主的話|基督的福音))/)) {
     const t = piece.trim();
     if (t) parts.push(t);
   }
