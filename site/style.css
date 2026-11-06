@@ -89,6 +89,10 @@ p.zh.intro { color: var(--ink-2); font-size: calc(var(--zh-size) * .92); }
 ruby { -webkit-ruby-position: after; ruby-position: under; ruby-align: center; }
 rt { font-family: var(--ui); font-size: var(--rt-size); line-height: 1; color: var(--ruby); padding: 0 .16em; letter-spacing: 0; font-weight: 500; }
 body.noruby rt { display: none; }
+/* Names at which the head is bowed */
+ruby.nm, strong.nm { font-weight: 700; }
+ruby.nm rt { font-weight: 700; color: var(--ink-2); }
+.en strong.nm, .la strong.nm { font-weight: 600; }
 body.noruby p.zh { line-height: 1.95; }
 .who { display: inline-block; font-family: var(--zh); font-size: .72rem; color: var(--rubric); font-weight: 700; margin-right: .45em; vertical-align: .25em; letter-spacing: .05em; }
 .who::after { content: "："; }

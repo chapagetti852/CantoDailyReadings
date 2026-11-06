@@ -40,12 +40,31 @@
     $("propLa").setAttribute("aria-pressed", String(settings.prop && settings.propLa));
   }
 
+  // Names at which the head is bowed: Jesus, Mary, the Pope (Leo). Mary Magdalene
+  // and Mary of Bethany (a section that also names Martha) are left plain, as is
+  // 良 in 良善 / 溫良: only the Pope's name (教宗良, 聖良, 大良, 良一世, 良十四世) counts.
+  const NAME_ZH = /耶穌|瑪利亞(?!瑪達肋納|瑪大肋納)|(?<=教宗|聖|大)良|良(?=一世|十四世)/g;
+  const NAME_ROMAN = /(?<!\p{L})(Jesus|Mary(?! Magdalene)|Leo|Iesu[sm]?|Mar[ií](?:a|ae|æ|am)|Le[oó]n(?:is|e|em|i))(?!\p{L})/gu;
+  let noMary = false; // set per section while rendering
+  function nameIndexes(zh) {
+    const set = new Set();
+    for (const m of zh.matchAll(NAME_ZH)) {
+      if (noMary && m[0].startsWith("瑪利亞")) continue;
+      const start = Array.from(zh.slice(0, m.index)).length;
+      for (let k = 0; k < Array.from(m[0]).length; k++) set.add(start + k);
+    }
+    return set;
+  }
+  const boldNames = (html) => html.replace(NAME_ROMAN, (w) => (noMary && /^Mar/.test(w) ? w : `<strong class="nm">${w}</strong>`));
+
   function rubyHtml(line) {
     const chars = Array.from(line.zh);
+    const names = nameIndexes(line.zh);
     let out = "";
     chars.forEach((ch, i) => {
       const y = line.yale[i];
-      out += y ? `<ruby>${esc(ch)}<rt>${esc(y)}</rt></ruby>` : esc(ch);
+      const cls = names.has(i) ? ' class="nm"' : "";
+      out += y ? `<ruby${cls}>${esc(ch)}<rt>${esc(y)}</rt></ruby>` : names.has(i) ? `<strong class="nm">${esc(ch)}</strong>` : esc(ch);
     });
     return out;
   }
@@ -77,14 +96,14 @@
       const ls = s.en.lines.map(enLine);
       body = keepLines ? ls.join("<br>") : ls.join(" ");
     }
-    return `<p class="en" lang="en" translate="yes">${dlg(s.en.pre, "pre")}${body}${dlg(s.en.post, "post")}</p>`;
+    return `<p class="en" lang="en" translate="yes">${boldNames(dlg(s.en.pre, "pre") + body + dlg(s.en.post, "post"))}</p>`;
   }
 
   function laHtml(s) {
     if (!s.la) return "";
     const ls = s.la.lines.map((l) => (/^(Vel|Or)\b/.test(l) ? `<i class="alt">${esc(l)}</i>` : esc(l)));
     const keep = s.kind === "entrance" || s.kind === "communion";
-    return `<p class="la" lang="la" translate="yes">${keep ? ls.join("<br>") : ls.join(" ")}</p>`;
+    return `<p class="la" lang="la" translate="yes">${boldNames(keep ? ls.join("<br>") : ls.join(" "))}</p>`;
   }
 
   function render(day) {
@@ -104,6 +123,7 @@
         html += `<details class="note"><summary>${esc(s.label)}</summary>${s.lines.map((l) => `<p class="zh">${lineHtml(l)}</p>`).join("")}</details>`;
         continue;
       }
+      noMary = [...s.lines.map((l) => l.zh), ...(s.en?.lines ?? []), ...(s.en?.verses ?? []).map((v) => v.text)].some((t) => /瑪爾大|Martha/.test(t));
       html += `<section class="${s.proper ? "proper" : "reading"}"><h2><span>${esc(s.label)}</span>${s.citation ? `<small>${esc(s.citation)}</small>` : ""}</h2>`;
       for (const line of s.lines) {
         const cls = RUBRIC.test(line.zh) ? "zh rubric" : /^【答】|^答[:：]/.test(line.zh) ? "zh resp" : /^——/.test(line.zh) ? "zh accl" : /^恭讀/.test(line.zh) ? "zh intro" : "zh";
@@ -111,6 +131,7 @@
       }
       html += enHtml(s) + laHtml(s) + "</section>";
     }
+    noMary = false;
     main.innerHTML = html;
     $("src").textContent = day.source && day.source.startsWith("http") ? `來源：${day.source.replace(/^https?:\/\//, "")} · ${day.generated.slice(0, 10)}` : "";
   }

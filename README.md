@@ -33,6 +33,10 @@ bible.usccb.org/bible/<book>/<ch> ──► scripts/lib/nabre.mjs (NABRE verses 
   (願主與你們同在 … 主，願光榮歸於你 … 基督，我們讚美你), and the psalm refrain written
   out after every strophe. The English carries the same parts from the US Missal,
   including the Lectionary's "A reading from …" line.
+- **Bowing names.** 耶穌 / Jesus / Iesus, 瑪利亞 / Mary / Maria and the Pope's name
+  (良 / Leo) are set in bold, with their Yale, so the head bow comes at the right word.
+  Mary Magdalene, Mary of Bethany (in a passage that names Martha) and 良 in words
+  like 良善 stay plain.
 - **Romanization.** `to-jyutping` (BSD-2, built on the CC-BY rime-cantonese lexicon) gives
   word-aware Jyutping; a small converter turns it into Yale with diacritics (tone 1 = macron).
   Fix a mispronunciation by adding the word to `overrides.json`.
