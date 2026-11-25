@@ -43,7 +43,9 @@ export const ABBR_RE = new RegExp(`(${ABBR_KEYS.join("|")})`);
 
 /** Find the USFM code for a line such as 恭讀聖馬爾谷福音 6:14-29 or 谷 6:14-29. */
 export function bookFromText(text) {
-  for (const k of FULL_KEYS) if (text.includes(k)) return FULL[k];
+  // 「聖伯多祿宗徒後書」「聖若望宗徒一書」: drop 宗徒 before 書 / 致 (but not in 宗徒大事錄).
+  const t = text.replace(/宗徒(?=(?:前|後|一|二|三)?書|致)/g, "");
+  for (const k of FULL_KEYS) if (t.includes(k)) return FULL[k];
   // Abbreviation must be immediately followed by a chapter:verse reference.
   const m = new RegExp(`(?:^|[^\\p{Script=Han}])?(${ABBR_KEYS.join("|")})\\s*(\\d+)\\s*[:：]`, "u").exec(text);
   return m ? ABBR[m[1]] : null;

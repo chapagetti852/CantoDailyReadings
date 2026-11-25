@@ -44,7 +44,8 @@ export const US_ABBR = {
 /** Parse "Mk 6:14-29", "Ps 18:31, 47, 50, 51", "1 Cor 15:1-8, 11", "Is 7:10-14; 8:10" into {book, verses:Set<"c:v">}. */
 export function parseUsCitation(text) {
   if (!text) return null;
-  const t = text.replace(/[–—]/g, "-").replace(/\s+/g, " ").trim().replace(/^(?:see|cf\.?|or)\s+/i, "");
+  const t = text.replace(/[–—]/g, "-").replace(/\s+/g, " ").trim().replace(/^(?:see|cf\.?|or)\s+/i, "")
+    .replace(/(\d[a-e]*)\s+and\s+(?=\d)/gi, "$1, "); // "Psalm 85:9ab and 10" -> "85:9ab, 10"
   const m = /^((?:[1-3] ?)?[A-Za-z]+)\.? ?(\d+[:,\d\s\-;ab]*)$/.exec(t) || /^((?:[1-3] ?)?[A-Za-z]+)\.? (\d.*)$/.exec(t);
   if (!m) return null;
   const book = US_ABBR[m[1].toLowerCase().replace(/\s+/g, "")];
@@ -173,6 +174,21 @@ function parseReadingsByHeadings(html) {
   return blocks;
 }
 
+const toBlocks = (html) => parseReadingsHtml(html).map((b) => ({ ...b, citation: { book: b.citation.book, verses: [...b.citation.verses], raw: b.citation.raw } }));
+
+/** Links from a day's index page to its per-Mass readings pages (122526-Night.cfm ...). */
+export function subPageUrls(html, url) {
+  const base = /\/(\d{6})\.cfm$/.exec(url)?.[1];
+  if (!base) return [];
+  const out = [];
+  for (const m of html.matchAll(/href="([^"]*\/bible\/readings\/(\d{6})-?[^"\/]*\.cfm)"/gi)) {
+    if (m[2] !== base) continue;
+    const abs = new URL(m[1].replace(/&amp;/g, "&"), url).href;
+    if (abs !== url && !out.includes(abs)) out.push(abs);
+  }
+  return out;
+}
+
 /** Jaccard overlap between a HK citation (parsed by citation.mjs) and a US citation. */
 export function overlap(hk, us) {
   if (!hk || !us || hk.book !== us.book) return 0;
@@ -195,8 +211,34 @@ export class Lectionary {
 
   async day(isoDate) {
     if (this.mem.has(isoDate)) return this.mem.get(isoDate);
-    const path = join(this.cacheDir, `${isoDate}.json`);
     const url = readingsUrl(isoDate);
+    const html = await this.page(isoDate, url, `${isoDate}.json`);
+    let blocks = [];
+    if (html != null) {
+      this.titles.set(isoDate, parseDayTitle(html));
+      blocks = toBlocks(html);
+      // Days with several Masses (Christmas, Thanksgiving) have an index page that
+      // links to one readings page per Mass: read them all and match by citation.
+      if (!blocks.length) {
+        for (const sub of subPageUrls(html, url).slice(0, 4)) {
+          const slug = sub.replace(/^.*\/\d{6}-?/, "").replace(/\.cfm$/, "").replace(/[^\w-]/g, "");
+          const subHtml = await this.page(isoDate, sub, `${isoDate}--${slug}.json`);
+          if (subHtml != null) blocks.push(...toBlocks(subHtml));
+        }
+      }
+      if (!blocks.length) {
+        this.failed.push(`${url}: fetched but no reading blocks recognised`);
+        this.log.warn(`! Lectionary parse failed for ${url}; first lines of page text:`);
+        for (const l of htmlToLines(html).slice(0, 80)) this.log.warn("  | " + l);
+      }
+    }
+    this.mem.set(isoDate, blocks);
+    return blocks;
+  }
+
+  /** Raw HTML of one readings page, from the disk cache or fetched once. */
+  async page(isoDate, url, file) {
+    const path = join(this.cacheDir, file);
     let html = null;
     if (existsSync(path)) {
       const obj = JSON.parse(readFileSync(path, "utf8"));
@@ -211,18 +253,7 @@ export class Lectionary {
         writeFileSync(path, JSON.stringify({ date: isoDate, url, fetched: new Date().toISOString(), html }));
       } else if (r.status === 404) this.failed.push(`${url}: 404`);
     }
-    let blocks = [];
-    if (html != null) {
-      this.titles.set(isoDate, parseDayTitle(html));
-      blocks = parseReadingsHtml(html).map((b) => ({ ...b, citation: { book: b.citation.book, verses: [...b.citation.verses], raw: b.citation.raw } }));
-      if (!blocks.length) {
-        this.failed.push(`${url}: fetched but no reading blocks recognised`);
-        this.log.warn(`! Lectionary parse failed for ${url}; first lines of page text:`);
-        for (const l of htmlToLines(html).slice(0, 80)) this.log.warn("  | " + l);
-      }
-    }
-    this.mem.set(isoDate, blocks);
-    return blocks;
+    return html;
   }
 
   /** Find the lectionary block matching a HK section's citation, or null. */

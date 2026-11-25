@@ -30,3 +30,14 @@ test("citation parsing", () => {
   assert.deepEqual(h.verses.map((x) => x.v), [1, 2, 3, 3, 4, 5, 6]);
 });
 
+
+test("letters written with 宗徒 before 書", async () => {
+  const { bookFromText } = await import("../scripts/lib/books.mjs");
+  assert.equal(bookFromText("恭讀聖伯多祿宗徒後書 3:8-14"), "2PE");
+  assert.equal(bookFromText("恭讀聖伯多祿宗徒前書 1:3-9"), "1PE");
+  assert.equal(bookFromText("恭讀聖若望宗徒一書 3:1-2"), "1JN");
+  assert.equal(bookFromText("恭讀聖雅各伯宗徒書 1:1-11"), "JAS");
+  assert.equal(bookFromText("恭讀宗徒大事錄 2:1-11"), "ACT");
+  assert.equal(bookFromText("恭讀聖保祿宗徒致厄弗所人書 2:1-10"), "EPH");
+  assert.equal(parseCitation("恭讀聖伯多祿宗徒後書 3:8-14").text, "伯後 3:8-14");
+});

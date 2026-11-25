@@ -136,3 +136,16 @@ test("readings inside a layout <form>, acclamation with a broken reference", () 
   assert.equal(blocks[1].citation.book, null);
   assert.deepEqual(blocks[2].lines, ["As Jesus passed by, two blind men followed him."]);
 });
+
+test("US citation with 'and'", () => {
+  assert.deepEqual([...parseUsCitation("Psalm 85:9ab and 10, 11-12, 13-14").verses], ["85:9", "85:10", "85:11", "85:12", "85:13", "85:14"]);
+  assert.ok(overlap(parseCitation("詠85:9-10,11-12,13-14"), parseUsCitation("Psalm 85:9ab and 10, 11-12, 13-14")) >= 0.8);
+});
+
+test("index page of a day with several Masses links to its readings pages", async () => {
+  const { subPageUrls } = await import("../scripts/lib/lectionary.mjs");
+  const html = `<a href="/bible/readings/122526.cfm">Today</a><a href="https://bible.usccb.org/bible/readings/122526-Vigil.cfm">Vigil Mass</a>
+    <a href="/bible/readings/122526-Night.cfm">Mass during the Night</a><a href="/bible/readings/122526-Night.cfm">again</a><a href="/bible/readings/122626.cfm">next day</a>`;
+  assert.deepEqual(subPageUrls(html, "https://bible.usccb.org/bible/readings/122526.cfm"),
+    ["https://bible.usccb.org/bible/readings/122526-Vigil.cfm", "https://bible.usccb.org/bible/readings/122526-Night.cfm"]);
+});
