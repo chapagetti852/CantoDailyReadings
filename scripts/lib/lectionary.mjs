@@ -56,6 +56,7 @@ export function parseUsCitation(text) {
     for (let piece of chunk.split(",")) {
       piece = piece.replace(/\s+/g, "").replace(/[a-z]/g, "");
       if (!piece) continue;
+      piece = piece.replace(/(\d+)(?:-\d+)+(-\d+)$/, "$1$2"); // a typo seen on the site: "85:9-10-11-12" -> "85:9-12"
       let r = /^(\d+):(\d+)-(\d+):(\d+)$/.exec(piece);
       if (r) { const [, c1, v1, c2, v2] = r.map(Number); for (let v = v1; v <= v1 + 200; v++) verses.add(`${c1}:${v}`); for (let v = 1; v <= v2; v++) verses.add(`${c2}:${v}`); chapter = c2; continue; }
       r = /^(\d+):(\d+)(?:-(\d+))?$/.exec(piece);
@@ -227,6 +228,8 @@ export class Lectionary {
         }
       }
       if (!blocks.length) {
+        const links = [...html.matchAll(/href="([^"]*readings[^"]*)"/gi)].map((m) => m[1]).filter((h, i, a) => a.indexOf(h) === i);
+        this.log.warn(`! Lectionary ${url}: links to readings pages: ${links.slice(0, 30).join(" ")}`);
         this.failed.push(`${url}: fetched but no reading blocks recognised`);
         this.log.warn(`! Lectionary parse failed for ${url}; first lines of page text:`);
         for (const l of htmlToLines(html).slice(0, 80)) this.log.warn("  | " + l);

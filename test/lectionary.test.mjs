@@ -140,6 +140,8 @@ test("readings inside a layout <form>, acclamation with a broken reference", () 
 test("US citation with 'and'", () => {
   assert.deepEqual([...parseUsCitation("Psalm 85:9ab and 10, 11-12, 13-14").verses], ["85:9", "85:10", "85:11", "85:12", "85:13", "85:14"]);
   assert.ok(overlap(parseCitation("詠85:9-10,11-12,13-14"), parseUsCitation("Psalm 85:9ab and 10, 11-12, 13-14")) >= 0.8);
+  assert.deepEqual([...parseUsCitation("Psalm 85:9-10-11-12, 13-14").verses], ["85:9", "85:10", "85:11", "85:12", "85:13", "85:14"]);
+  assert.deepEqual([...parseUsCitation("Matthew 9:35-10:1").verses].slice(-1), ["10:1"]);
 });
 
 test("index page of a day with several Masses links to its readings pages", async () => {
