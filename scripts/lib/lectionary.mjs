@@ -182,7 +182,8 @@ export function subPageUrls(html, url) {
   const base = /\/(\d{6})\.cfm$/.exec(url)?.[1];
   if (!base) return [];
   const out = [];
-  for (const m of html.matchAll(/href="([^"]*\/bible\/readings\/(\d{6})-?[^"\/]*\.cfm)"/gi)) {
+  // Seen: "/bible/readings/112626-Ordinary", "/bible/readings/112626-Thanksgiving" (no .cfm)
+  for (const m of html.matchAll(/href="([^"]*\/bible\/readings\/(\d{6})-[A-Za-z][\w-]*(?:\.cfm)?)"/gi)) {
     if (m[2] !== base) continue;
     const abs = new URL(m[1].replace(/&amp;/g, "&"), url).href;
     if (abs !== url && !out.includes(abs)) out.push(abs);

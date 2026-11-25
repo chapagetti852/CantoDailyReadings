@@ -150,4 +150,9 @@ test("index page of a day with several Masses links to its readings pages", asyn
     <a href="/bible/readings/122526-Night.cfm">Mass during the Night</a><a href="/bible/readings/122526-Night.cfm">again</a><a href="/bible/readings/122626.cfm">next day</a>`;
   assert.deepEqual(subPageUrls(html, "https://bible.usccb.org/bible/readings/122526.cfm"),
     ["https://bible.usccb.org/bible/readings/122526-Vigil.cfm", "https://bible.usccb.org/bible/readings/122526-Night.cfm"]);
+  // the Thanksgiving 2026 index, as served
+  const t = `<a href="https://bible.usccb.org/bible/readings/112626.cfm.md">md</a><a href="https://bible.usccb.org/bible/readings/112626.cfm?amp">amp</a>
+    <a href="https://bible.usccb.org/bible/readings/112626-Ordinary">Thursday</a><a href="https://bible.usccb.org/bible/readings/112626-Thanksgiving">Thanksgiving Day</a>`;
+  assert.deepEqual(subPageUrls(t, "https://bible.usccb.org/bible/readings/112626.cfm"),
+    ["https://bible.usccb.org/bible/readings/112626-Ordinary", "https://bible.usccb.org/bible/readings/112626-Thanksgiving"]);
 });
