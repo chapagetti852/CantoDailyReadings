@@ -202,14 +202,16 @@ const SANCTORAL = [
   ["11-22", "S. Caeciliae, virginis et martyris", "則濟利亞"],
   ["11-23", "S. Clementis I, papae et martyris", "克雷孟"],
   ["11-23", "S. Columbani, abbatis", "高隆邦"],
-  ["11-24", "Ss. Andreae Dung-Lac, presbyteri, et sociorum, martyrum", "楊", "越南殉道"],
+  ["11-24", "Ss. Andreae Dung-Lac, presbyteri, et sociorum, martyrum", "安勇樂", "越南殉道"],
   ["11-25", "S. Catharinae Alexandrinae, virginis et martyris", "加大利納"],
   ["11-30", "S. Andreae, apostoli", "安德肋"],
   ["12-03", "S. Francisci Xavier, presbyteri", "沙勿略"],
   ["12-04", "S. Ioannis Damasceni, presbyteri et Ecclesiae doctoris", "達瑪森"],
   ["12-06", "S. Nicolai, episcopi", "尼各老"],
   ["12-07", "S. Ambrosii, episcopi et Ecclesiae doctoris", "盎博羅削"],
-  ["12-08", "In Conceptione Immaculata Beatae Mariae Virginis", "無染原罪", "無原罪"],
+  ["12-08", "In Conceptione Immaculata Beatae Mariae Virginis", "無玷始胎", "無染原罪", "無原罪"],
+  // Hong Kong: dedication of the Cathedral of the Immaculate Conception
+  ["12-09", "In anniversario Dedicationis ecclesiae cathedralis", "主教座堂祝聖"],
   ["12-09", "S. Ioannis Didaci Cuauhtlatoatzin", "狄雅各"],
   ["12-10", "Beatae Mariae Virginis de Loreto", "樂勒托", "羅勒托"],
   ["12-11", "S. Damasi I, papae", "達瑪穌"],
@@ -226,7 +228,7 @@ const SANCTORAL = [
 ];
 
 /** A title line that names a celebration rather than a date, a ferial day or a biography. */
-export const FEAST_LINE = /（(紀念|自由紀念|慶日|節)）|節$/;
+export const FEAST_LINE = /（(紀念|自由紀念|慶日|節|節日)）|節$/;
 
 /**
  * The Latin name of the celebration on `iso` when one of the Hong Kong title
@@ -236,8 +238,10 @@ export const FEAST_LINE = /（(紀念|自由紀念|慶日|節)）|節$/;
  */
 export function latinFeastTitle(iso, titleLines) {
   const md = iso.slice(5, 10);
-  const feastLines = (titleLines ?? []).filter((t) => FEAST_LINE.test(t) && t.length < 60);
-  if (!feastLines.length) return null;
+  const short = (titleLines ?? []).filter((t) => t.length < 60);
+  if (!short.some((t) => FEAST_LINE.test(t))) return null;
+  // The rank can stand on its own line: 「聖方濟．沙勿略司鐸」 /「（傳教區主要主保）（慶日）」
+  const feastLines = short;
   for (const [day, la, ...keys] of SANCTORAL) {
     if (day !== md) continue;
     if (feastLines.some((t) => keys.some((k) => t.includes(k)))) return la;

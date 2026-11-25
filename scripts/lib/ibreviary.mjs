@@ -282,7 +282,11 @@ export class IBreviary {
     };
     let best = null, bestScore = 0;
     en.sets.forEach((set, i) => { const s = score(set); if (s > bestScore) { best = i; bestScore = s; } });
-    if (best == null) return { en: null, la: null, title: en.title[0] ?? null };
+    if (best == null) {
+      const offered = en.sets.map((set) => set.filter((b) => b.kind === "entrance" || b.kind === "communion").map((b) => `${b.kind} ${b.citation ?? "?"}`).join(", ")).join(" | ");
+      this.failed.push(`${iso}: no formulary matches HK entrance ${entrance?.text ?? "-"} / communion ${communion?.text ?? "-"}; iBreviary offers: ${offered || "nothing"}`);
+      return { en: null, la: null, title: en.title[0] ?? null };
+    }
     const la = await this.page(iso, "la");
     let laSet = la?.sets[best] ?? la?.sets[0] ?? null;
     if (laSet && en.sets[best] && JSON.stringify(laSet) === JSON.stringify(en.sets[best])) {

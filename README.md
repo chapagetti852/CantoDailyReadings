@@ -46,6 +46,8 @@ bible.usccb.org/bible/<book>/<ch> ──► scripts/lib/nabre.mjs (NABRE verses 
      overlap of 80% or more), its Lectionary wording is used; the Gospel acclamation comes
      along when the Gospel matches.
   2. Otherwise the cited verses are taken from the NABRE chapter pages on the USCCB site.
+  The readings page is cut at its `<h3>` headings, or, when a layout has none, read as
+  text and cut at the heading lines ("Reading 1", "Responsorial Psalm", "Gospel").
   Pages are fetched politely and kept in the Actions cache, so each page is fetched once.
   The USCCB site serves about three pages per run before answering with a JavaScript
   challenge, which the build treats as "not today" rather than trying to defeat; the
@@ -65,7 +67,10 @@ bible.usccb.org/bible/<book>/<ch> ──► scripts/lib/nabre.mjs (NABRE verses 
 - **App.** `site/` is plain HTML/CSS/JS: date arrows and swipe; a 粵 toggle for Yale and
   讀 / 禱 drop-downs for the readings and the propers, each with 中文 (the group itself)
   plus English, and Latine for the propers; separate sliders for the Yale and the Chinese
-  text size; dark mode; offline cache of visited days via a service worker; installable
+  text size; dark mode; arrow keys on a keyboard; a 回今日 mark on the date when another
+  day is shown (tap the date to go back), and the page moves to the new day by itself when
+  reopened after midnight; arrows stop at the ends of the deployed window; every day in
+  the window is saved for offline use as soon as the page opens; installable
   to the home screen. The page is marked `translate="no"` so browsers do not offer to translate
   the Chinese; the English blocks are marked `lang="en"`.
 

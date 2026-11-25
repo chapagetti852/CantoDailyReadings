@@ -105,3 +105,20 @@ test("scripture lines beginning with footer words do not end a reading", () => {
   const [b] = parseReadingsHtml(html);
   assert.deepEqual(b.lines, ["You were dead in your transgressions", "following the ruler of the power of the air,", "Listen to him.", "Share your bread."]);
 });
+
+test("readings page without <h3> headings is read as text", () => {
+  // The December 2026 layout: headings in plain blocks, verses in paragraphs with <br>.
+  const html = `<html><body><nav>Daily Readings</nav><div class="wrap"><div class="name">Wednesday of the Second Week of Advent</div><div>Lectionary: 183</div>
+    <div class="b-verse"><div class="title">Reading 1</div><div class="address"><a href="#">Isaiah 40:25-31</a></div>
+    <div class="body"><p>To whom can you liken me as an equal?<br>says the Holy One.<br>Lift up your eyes on high</p></div></div>
+    <div class="b-verse"><div class="title">Responsorial Psalm</div><div class="address"><a href="#">Psalm 103:1-2, 3-4, 8 and 10</a></div>
+    <div class="body"><p>R. (1) O bless the Lord, my soul!<br>Bless the LORD, O my soul;</p></div></div>
+    <div class="b-verse"><div class="title">Alleluia</div><div class="address">See Isaiah 40:1-2</div><div class="body"><p>R. Alleluia, alleluia.<br>Behold, the Lord comes.<br>R. Alleluia, alleluia.</p></div></div>
+    <div class="b-verse"><div class="title">Gospel</div><div class="address">Matthew 11:28-30</div><div class="body"><p>Jesus said to the crowds:<br>"Come to me, all you who labor."</p></div></div>
+    <div>Share</div><div>Lectionary for Mass for Use in the Dioceses of the United States, second typical edition</div></div></body></html>`;
+  const blocks = parseReadingsHtml(html);
+  assert.deepEqual(blocks.map((b) => b.kind), ["reading1", "psalm", "alleluia", "gospel"]);
+  assert.deepEqual(blocks[0].lines, ["To whom can you liken me as an equal?", "says the Holy One.", "Lift up your eyes on high"]);
+  assert.equal(blocks[3].lines.at(-1), '"Come to me, all you who labor."');
+  assert.equal(blocks[2].citation.book, "ISA");
+});

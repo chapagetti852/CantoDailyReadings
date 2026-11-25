@@ -44,7 +44,7 @@ export function parseCitation(text) {
       }
     }
   }
-  const ref = refPart.replace(/\s+/g, "").replace(/,/g, ", ").replace(/;/g, "; ").trim();
+  const ref = refPart.replace(/\s+/g, "").replace(/[;,\-]+$/, "").replace(/,/g, ", ").replace(/;/g, "; ").trim();
   return verses.length ? { book, verses, raw: text.trim(), text: `${CODE_TO_ABBR[book]} ${ref}` } : null;
 }
 

@@ -80,7 +80,8 @@
     return label + body;
   }
 
-  const RUBRIC = /^（[^）]*）$|^或$|^\(.*\)$/;
+  // Instructions rather than text to be read: shown small and red, without Yale.
+  const RUBRIC = /^（[^）]*）$|^或$|^\(.*\)$|^(?:不念)?(?:光榮頌|信經)$|^可舉行隆重祝福$|^適用於.{0,40}$|^[^。，；]{0,12}頌謝詞(?:（[^）]*）)*$/;
 
   const enLine = (l) => (/^R\.|^R:/.test(l) ? `<b><span class="r">R.</span> ${esc(l.replace(/^R\.?\s*(\([^)]*\))?\s*/, ""))}</b>` : /^(Or|Vel)\b/.test(l) ? `<i class="alt">${esc(l)}</i>` : esc(l));
   const dlg = (ls, cls) => (ls && ls.length ? `<span class="dlg ${cls}">${ls.map(enLine).join("<br>")}</span>` : "");
@@ -137,10 +138,33 @@
   }
 
   let current = null;
+  let available = null; // dates in the current deployment, from data/index.json
+  function updateNav() {
+    const today = hkToday();
+    $("today").classList.toggle("away", current !== today);
+    $("today").title = current === today ? "今日" : "回到今日";
+    if (!available || !available.length) return;
+    $("prev").disabled = current <= available[0];
+    $("next").disabled = current >= available[available.length - 1];
+  }
+  async function loadIndex() {
+    try {
+      const res = await fetch("data/index.json", { cache: "no-cache" });
+      if (!res.ok) return;
+      available = ((await res.json()).dates || []).slice().sort();
+      updateNav();
+      // Keep the whole window for offline use (at Mass with no signal): the
+      // service worker stores each day as it is fetched.
+      const idle = window.requestIdleCallback || ((f) => setTimeout(f, 1500));
+      idle(async () => { for (const d of available) { try { await fetch(`data/${d}.json`); } catch {} } });
+    } catch {}
+  }
   async function show(date) {
+    if (available && available.length && (date < available[0] || date > available[available.length - 1]) && date !== hkToday()) return;
     current = date;
     location.hash = date;
     $("dateText").textContent = fmtDate(date);
+    updateNav();
     main.innerHTML = `<p class="muted">載入中…</p>`;
     try {
       const res = await fetch(`data/${date}.json`, { cache: "no-cache" });
@@ -181,16 +205,34 @@
   $("zhSize").oninput = (e) => { settings.zhSize = Number(e.target.value); saveSettings(); applySettings(); };
   window.addEventListener("hashchange", () => { const d = dateFromHash(); if (d && d !== current) show(d); });
 
-  // Swipe left/right to change day
-  let touchX = null;
-  document.addEventListener("touchstart", (e) => { touchX = e.touches[0].clientX; }, { passive: true });
-  document.addEventListener("touchend", (e) => {
-    if (touchX == null) return;
-    const dx = e.changedTouches[0].clientX - touchX; touchX = null;
-    if (Math.abs(dx) > 90) show(addDays(current, dx < 0 ? 1 : -1));
+  // Swipe left/right to change day; not while dragging a slider or scrolling.
+  let touch = null;
+  document.addEventListener("touchstart", (e) => {
+    touch = e.target.closest("nav.tools, input") ? null : { x: e.touches[0].clientX, y: e.touches[0].clientY };
   }, { passive: true });
+  document.addEventListener("touchend", (e) => {
+    if (!touch) return;
+    const dx = e.changedTouches[0].clientX - touch.x, dy = e.changedTouches[0].clientY - touch.y; touch = null;
+    if (Math.abs(dx) > 90 && Math.abs(dx) > 2 * Math.abs(dy)) show(addDays(current, dx < 0 ? 1 : -1));
+  }, { passive: true });
+  // Arrow keys on a keyboard.
+  document.addEventListener("keydown", (e) => {
+    if (e.target.closest("input, textarea") || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === "ArrowLeft") show(addDays(current, -1));
+    if (e.key === "ArrowRight") show(addDays(current, 1));
+  });
+  // A tap on the text closes an open option row.
+  main.addEventListener("click", () => { if (Object.values(PANELS).some((p) => !$(p).hidden)) openPanel(null); });
 
   applySettings();
   show(dateFromHash() || hkToday());
+  loadIndex();
+  // Back on the page on a later day (an app left open overnight): move to that day.
+  let lastToday = hkToday();
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) return;
+    const t = hkToday();
+    if (t !== lastToday) { if (current === lastToday) show(t); lastToday = t; loadIndex(); }
+  });
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 })();

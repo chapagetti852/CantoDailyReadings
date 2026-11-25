@@ -57,3 +57,27 @@ test("a dash inside the text does not start a new line", async () => {
   const r = page.sections.find((s) => s.kind === "reading1");
   assert.deepEqual(r.lines, ["恭讀厄則克耳先知書", "看，有水湧出，流向東方——因為聖殿正面朝東。", "——上主的話。"]);
 });
+
+test("Sunday page: split citation, multi-part references, prefaces, 領主後經", async () => {
+  const { parseDlcHtml } = await import("../scripts/lib/dlc.mjs");
+  const html = `<html><body><p>將臨期第二主日</p>
+    <p>進堂詠</p><p>主將來臨，決不遲延。（哈2:3；格前4:5）</p>
+    <p>集禱經</p><p>全能的天主……亞孟。</p>
+    <p>讀經一（安慰我的百姓）</p><p>恭讀依撒意亞先知書 63:16-17,19;64:2-7</p><p>你、上主是我們的父親。——上主的話。</p>
+    <p>福音（醒寤）</p><p>恭讀聖瑪竇福音 9:</p><p>27-31</p><p>正當耶穌前行。——上主的話。</p>
+    <p>獻禮經</p><p>上主……亞孟。</p>
+    <p>宗徒頌謝詞（一）</p><p>主、聖父……</p><p>宗徒頌謝詞（二）</p><p>主、聖父……</p>
+    <p>領主詠</p><p>耶路撒冷！請你起來。（巴5:5,4:36）</p><p>（領主後默禱片刻）</p>
+    <p>領主後經</p><p>上主，求你……亞孟。</p><p>可舉行隆重祝福</p></body></html>`;
+  const page = parseDlcHtml(new TextEncoder().encode(html));
+  const by = (k) => page.sections.find((s) => s.kind === k);
+  assert.deepEqual(page.sections.map((s) => s.kind), ["entrance", "collect", "reading1", "gospel", "offertory", "preface", "communion", "postcommunion"]);
+  assert.deepEqual(by("entrance").lines, ["主將來臨，決不遲延。"]);
+  assert.equal(by("entrance").citation.text, "哈 2:3");
+  assert.deepEqual(by("communion").lines, ["耶路撒冷！請你起來。", "（領主後默禱片刻）"]);
+  assert.equal(by("reading1").lines[0], "恭讀依撒意亞先知書");
+  assert.equal(by("gospel").citation.text, "瑪 9:27-31");
+  assert.equal(by("gospel").lines[0], "恭讀聖瑪竇福音");
+  assert.deepEqual(by("preface").lines, ["宗徒頌謝詞（一）", "主、聖父……", "宗徒頌謝詞（二）", "主、聖父……"]);
+  assert.deepEqual(by("postcommunion").lines, ["上主，求你……亞孟。", "可舉行隆重祝福"]);
+});

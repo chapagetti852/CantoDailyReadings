@@ -28,9 +28,10 @@ const HEADERS = [
   ["gospel", /^福音(?!前)/, true],
   ["intercessions", /^信友禱文/, false],
   ["offertory", /^獻禮經/, false],
-  ["preface", /^頌謝詞/, false],
+  // "頌謝詞", "將臨期頌謝詞（一）（基督的兩次來臨）", "宗徒頌謝詞（二）" ...
+  ["preface", /^[^。，；]{0,12}頌謝詞(?:[（(][^）)]*[）)])*$/, false],
   ["communion", /^領主詠/, false],
-  ["postcommunion", /^領聖體後經/, false],
+  ["postcommunion", /^領(?:聖體|主)後經/, false],  // weekdays 領聖體後經, Sundays 領主後經
   ["blessing", /^(隆重)?降福/, false],
 ];
 export const SCRIPTURE_KINDS = new Set(HEADERS.filter((h) => h[2]).map((h) => h[0]));
@@ -53,8 +54,9 @@ function headerFor(line) {
 }
 
 const TITLE_MAX = 36;
-const TRAILING_CITE = new RegExp(`\\s*[（(]\\s*(?:參閱|參|cf\\.?)?\\s*${ABBR_RE.source}\\s*\\d+\\s*[:：][\\d\\s,，、;；\\-–a-z]*[)）]\\s*$`, "u");
-const INTRO_CITE = /^(恭讀.+?)\s*\d+\s*[:：]\s*[\d\s,，、;；\-–a-z]+$/u;
+// A closing reference in brackets, possibly several: 「…（哈2:3；格前4:5）」 「…（巴5:5,4:36）」
+const TRAILING_CITE = new RegExp(`\\s*[（(]\\s*(?:參閱|參|cf\\.?)?\\s*${ABBR_RE.source}\\s*\\d+\\s*[:：][^（）()]{0,40}[)）]\\s*$`, "u");
+const INTRO_CITE = /^(恭讀.+?)\s*\d+\s*[:：]\s*[\d\s,，、;；:：\-–a-z.]+$/u;
 
 /** Break a page line into display lines: the "——上主的話。" acclamation on its own, citations shown in the heading dropped from the text. */
 function splitLine(line) {
@@ -77,9 +79,20 @@ const isBiography = (l) => l.length > 120 && /。/.test(l);
  * sections may include kind "divider" (start of an alternative formulary / set
  * of prayers, e.g. 第二式 or an optional memorial) and are otherwise in page order.
  */
+/** Rejoin a citation the page breaks across lines: 「恭讀聖瑪竇福音 9:」 + 「27-31」. */
+export function joinBrokenCitations(lines) {
+  const out = [];
+  for (const l of lines) {
+    const prev = out[out.length - 1];
+    if (prev && /\d\s*[:：\-–,，;；]\s*$/.test(prev) && /^[\d][\d\s,，、;；:：\-–a-z.]*$/.test(l)) out[out.length - 1] = prev + l;
+    else out.push(l);
+  }
+  return out;
+}
+
 export function parseDlcHtml(bytes) {
   const { text: html, charset } = decodeHtml(bytes);
-  const lines = htmlToLines(html);
+  const lines = joinBrokenCitations(htmlToLines(html));
   const pageTitle = titleOf(html);
   const sections = [];
   const title = [];
@@ -89,6 +102,8 @@ export function parseDlcHtml(bytes) {
   for (const line of lines) {
     const kind = headerFor(line);
     if (kind) {
+      // A second preface name ("宗徒頌謝詞（二）") is an alternative, not a new formulary.
+      if (kind === "preface" && cur?.kind === "preface") { cur.lines.push(line); continue; }
       if (seenInSet.has(kind)) {
         // A repeated heading means a second formulary. Lines that trail the
         // previous section and look like a title become the divider's title.
@@ -104,6 +119,7 @@ export function parseDlcHtml(bytes) {
       seenInSet.add(kind);
       cur = { kind, label: KIND_LABEL[kind], heading: line, citation: null, lines: [] };
       sections.push(cur);
+      if (kind === "preface" && line !== "頌謝詞") cur.lines.push(line); // keep the preface's name
       const c = parseCitation(line);
       if (c) cur.citation = c;
       continue;

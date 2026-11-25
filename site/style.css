@@ -34,6 +34,8 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .bar .nav { font-family: var(--en); font-size: 1.5rem; line-height: 1; color: var(--rubric); padding: .1rem .6rem; }
 .bar .date { flex: 1; font-size: .95rem; letter-spacing: .06em; color: var(--ink); }
 .bar .date:active { color: var(--rubric); }
+.bar .date.away::after { content: "回今日"; margin-left: .5em; font-family: var(--zh); font-size: 11px; letter-spacing: .08em; color: var(--rubric); border: 1px solid var(--rubric); border-radius: 999px; padding: 1px 6px; vertical-align: 2px; }
+.bar .nav:disabled { opacity: .2; }
 
 /* Toggles: a row of coins with captions; sizes in px so the chrome never scales with the text */
 .tools { max-width: 38rem; margin: 0 auto; font-family: var(--ui); font-size: 14px; }

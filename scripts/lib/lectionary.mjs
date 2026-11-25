@@ -99,6 +99,46 @@ export function parseDayTitle(html) {
 }
 
 export function parseReadingsHtml(html) {
+  const blocks = parseReadingsByHeadings(html);
+  return blocks.length ? blocks : parseReadingsByText(html);
+}
+
+const HEADING_LINE = /^(?:Reading\s*(?:1|2|I|II)|First Reading|Second Reading|Responsorial Psalm|Sequence|Alleluia|Gospel Acclamation|Verse Before the Gospel|Gospel)$/i;
+
+/**
+ * Layout-independent fallback: read the page as text lines and cut it at the
+ * reading headings ("Reading 1", "Responsorial Psalm", "Alleluia", "Gospel"),
+ * each followed within a few lines by its citation.
+ */
+export function parseReadingsByText(html) {
+  const body = html.replace(/<(script|style|noscript|nav|header|footer|aside|form)\b[\s\S]*?<\/\1>/gi, "");
+  const lines = htmlToLines(body);
+  const blocks = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (!HEADING_LINE.test(lines[i])) continue;
+    const heading = lines[i];
+    const kindEntry = KIND_OF_HEADING.find(([, re]) => re.test(heading));
+    if (!kindEntry) continue;
+    let citation = null, j = i + 1;
+    for (; j < Math.min(lines.length, i + 4); j++) {
+      const c = parseUsCitation(lines[j]);
+      if (c) { citation = c; j++; break; }
+    }
+    if (!citation) continue;
+    const text = [];
+    for (; j < lines.length; j++) {
+      const l = lines[j];
+      if (HEADING_LINE.test(l) || STOP_RE.test(l)) break;
+      if (/^(?:Lectionary:|Or\b|OR\b|Read the|Get the)/.test(l)) continue;
+      text.push(l);
+    }
+    if (text.length) blocks.push({ kind: kindEntry[0], heading, citation, lines: text });
+    i = j - 1;
+  }
+  return blocks;
+}
+
+function parseReadingsByHeadings(html) {
   const body = html.replace(/<(script|style|noscript|nav|header|footer|aside|form)\b[\s\S]*?<\/\1>/gi, "");
   const pieces = body.split(/<h3\b[^>]*>/i).slice(1);
   const blocks = [];
