@@ -103,6 +103,7 @@ export function parseReadingsHtml(html) {
   return blocks.length ? blocks : parseReadingsByText(html);
 }
 
+const NO_CITATION = { book: null, verses: new Set(), raw: "" };
 const HEADING_LINE = /^(?:Reading\s*(?:1|2|I|II)|First Reading|Second Reading|Responsorial Psalm|Sequence|Alleluia|Gospel Acclamation|Verse Before the Gospel|Gospel)$/i;
 
 /**
@@ -111,8 +112,10 @@ const HEADING_LINE = /^(?:Reading\s*(?:1|2|I|II)|First Reading|Second Reading|Re
  * each followed within a few lines by its citation.
  */
 export function parseReadingsByText(html) {
-  const body = html.replace(/<(script|style|noscript|nav|header|footer|aside|form)\b[\s\S]*?<\/\1>/gi, "");
-  const lines = htmlToLines(body);
+  // Only code is removed: the readings may sit inside a <form> or <header> of the layout.
+  const body = html.replace(/<(script|style|noscript|svg)\b[\s\S]*?<\/\1>/gi, "");
+  const lines = htmlToLines(body).filter((l) => /[\p{L}\d]/u.test(l)); // drops stray markup such as '">'
+
   const blocks = [];
   for (let i = 0; i < lines.length; i++) {
     if (!HEADING_LINE.test(lines[i])) continue;
@@ -124,6 +127,9 @@ export function parseReadingsByText(html) {
       const c = parseUsCitation(lines[j]);
       if (c) { citation = c; j++; break; }
     }
+    // The acclamation's reference is sometimes missing or broken in the page's markup;
+    // keep the block (it is attached once the Gospel matches), without a citation.
+    if (!citation && kindEntry[0] === "alleluia") { citation = NO_CITATION; j = i + 1; }
     if (!citation) continue;
     const text = [];
     for (; j < lines.length; j++) {
@@ -159,6 +165,7 @@ function parseReadingsByHeadings(html) {
       const c = parseUsCitation(lines[i].replace(/^(?:Lectionary.*)$/i, ""));
       if (c) { citation = c; start = i + 1; break; }
     }
+    if (!citation && kindEntry[0] === "alleluia") citation = NO_CITATION;
     if (!citation) continue;
     const text = lines.slice(start).filter((l) => !/^(?:Lectionary:|Or\b|OR\b|Read the|Get the)/.test(l));
     blocks.push({ kind: kindEntry[0], heading, citation, lines: text });

@@ -122,3 +122,17 @@ test("readings page without <h3> headings is read as text", () => {
   assert.equal(blocks[3].lines.at(-1), '"Come to me, all you who labor."');
   assert.equal(blocks[2].citation.book, "ISA");
 });
+
+test("readings inside a layout <form>, acclamation with a broken reference", () => {
+  const html = `<html><body><header><nav>Daily Readings</nav></header><form id="page">
+    <div class="title">Reading 1</div><div class="address">Isaiah 29:17-24</div><div><p>Thus says the Lord GOD:<br>But a very little while,</p></div>
+    <div class="title">Alleluia</div><div class="address"><a href="https://bible.usccb.org/bible/isaiah/40?10"">"></a></div>
+    <div><p>R. Alleluia, alleluia.<br>Behold, our Lord shall come with power;<br>R. Alleluia, alleluia.</p></div>
+    <div class="title">Gospel</div><div class="address">Matthew 9:27-31</div><div><p>As Jesus passed by, two blind men followed him.</p></div>
+    <div>Share</div></form><footer>Copyright</footer></body></html>`;
+  const blocks = parseReadingsHtml(html);
+  assert.deepEqual(blocks.map((b) => b.kind), ["reading1", "alleluia", "gospel"]);
+  assert.deepEqual(blocks[1].lines, ["R. Alleluia, alleluia.", "Behold, our Lord shall come with power;", "R. Alleluia, alleluia."]);
+  assert.equal(blocks[1].citation.book, null);
+  assert.deepEqual(blocks[2].lines, ["As Jesus passed by, two blind men followed him."]);
+});
